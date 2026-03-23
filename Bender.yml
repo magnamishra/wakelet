@@ -19,7 +19,7 @@ dependencies:
   hwpe-ctrl:              { git: "https://github.com/pulp-platform/hwpe-ctrl.git",        version: 1.6 }
   hwpe-datamover-example: { git: "https://github.com/sermazz/hwpe-datamover-example.git", rev: bf8a5e13c2700d93039b6455bdcab689d4ced810 } # branch: smazzola/wakelet
   # Local dependencies
-  wakelet-pd: { path: "target/asic" }
+  #wakelet-pd: { path: "target/asic" }
 
 
 sources:
