@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+// Magna Mishra   < Wakelet soc integration only> 
 
 `include "axi/assign.svh"
 `include "reqrsp_interface/typedef.svh"
@@ -10,7 +11,10 @@
 
 module wl_top
   import wl_pkg::*;
-#()(
+#(
+  // Adding to debug core hang issue
+  parameter logic [31:0] BaseOffset= 32'h0; 
+)(
   input logic     clk_i,
   input logic     rst_ni,
   // AXI Lite interface (slave port)
@@ -68,23 +72,23 @@ module wl_top
   localparam cluster_bus_rule_t [ClusterBusNumRules-1:0] ClusterBusAddrMap = '{
     '{ // everything above cluster
         idx: 32'd0, // to external AXI narrow master port
-        start_addr: DataMemBaseAddr + DataMemOffset,
+        start_addr: BaseOffset + DataMemBaseAddr + DataMemOffset,
         end_addr: 32'hFFFF_FFFF
     },
     '{ // Core data memory
         idx: 32'd2, // to core data memory
-        start_addr: DataMemBaseAddr,
-        end_addr: DataMemBaseAddr + DataMemOffset
+        start_addr: BaseOffset + DataMemBaseAddr,
+        end_addr: BaseOffset+ DataMemBaseAddr + DataMemOffset
     },
     '{ // Instruction memory
         idx: 32'd1, // to core instr memory
-        start_addr: InstrMemBaseAddr,
-        end_addr: InstrMemBaseAddr + InstrMemOffset
+        start_addr: BaseOffset + InstrMemBaseAddr,
+        end_addr: BaseOffset + InstrMemBaseAddr + InstrMemOffset
     },
     '{ // everything below cluster
         idx: 32'd0, // to external AXI narrow master port
         start_addr: 32'h0000_0000,
-        end_addr: InstrMemBaseAddr
+        end_addr: BaseOffset + InstrMemBaseAddr
     }
   };
 
@@ -200,7 +204,9 @@ module wl_top
   core_data_req_t bus_data_mem_remap_req;
   always_comb begin : bus_data_mem_addr_remap
     bus_data_mem_remap_req = bus_data_mem_req;
-    bus_data_mem_remap_req.q.addr = bus_data_mem_req.q.addr & (DataMemOffset - 1);
+    
+    //Removes offset, Wakelet sees internal IMEM address only 
+    bus_data_mem_remap_req.q.addr = (bus_data_mem_req.q.addr - BaseOffset) & (DataMemOffset - 1);
   end
   
 
@@ -273,7 +279,8 @@ module wl_top
 
   // Remap address
   axi_addr_t bus_instr_mem_addr_remap;
-  assign bus_instr_mem_addr_remap = bus_instr_mem_addr & (InstrMemOffset - 1);
+  //Removes offset, Wakelet sees internal IMEM address only 
+  assign bus_instr_mem_addr_remap = (bus_instr_mem_addr - BaseOffset) & (InstrMemOffset - 1);
 
   /////////////////
   // Snitch core //
