@@ -13,7 +13,7 @@ module wl_top
   import wl_pkg::*;
 #(
   // Adding to debug core hang issue
-  parameter logic [31:0] BaseOffset= 32'h0; 
+  parameter logic [31:0] BaseOffset= 32'h0
 )(
   input logic     clk_i,
   input logic     rst_ni,
