@@ -32,7 +32,10 @@ module wl_top
   output axi_resp_t axi_wide_slv_rsp_o
 );
 
-  $display("entered wakelet"); 
+  initial begin 
+    $display ("[WAKELET] BaseOffset = 0x%h", BaseOffset); 
+  end 
+
   ////////////////////////
   // AXI Lite interface //
   ////////////////////////
@@ -93,8 +96,6 @@ module wl_top
     }
   };
 
-  $display("close to Xbar");
-  
   // Cluster bus xbar config
   localparam axi_pkg::xbar_cfg_t ClusterBusXbarCfg = '{
     NoSlvPorts:     ClusterBusNumMasters,
@@ -203,7 +204,6 @@ module wl_top
   `REQRSP_ASSIGN_TO_REQ(bus_data_mem_req, bus_data_mem_reqrsp_in)
   `REQRSP_ASSIGN_FROM_RESP(bus_data_mem_reqrsp_in, bus_data_mem_rsp)
 
-  $display("remapping start"); 
   // Remap address
   core_data_req_t bus_data_mem_remap_req;
   always_comb begin : bus_data_mem_addr_remap
