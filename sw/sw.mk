@@ -7,7 +7,9 @@
 WL_SW_DIR = $(WL_ROOT)/sw
 
 # Tooling
-GCC_ROOT ?= $(dir $(shell which riscv32-unknown-elf-gcc))
+#GCC_ROOT ?= $(dir $(shell which riscv32-unknown-elf-gcc))
+GCC_ROOT= /usr/pack/riscv-1.0-kgf/default/bin
+
 
 CC      := $(GCC_ROOT)/riscv32-unknown-elf-gcc
 OBJCOPY := $(GCC_ROOT)/riscv32-unknown-elf-objcopy
