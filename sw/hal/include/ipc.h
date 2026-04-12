@@ -21,4 +21,6 @@
 
 #define IPC_INT_TRIG (IPC_BASE + 0x00000000)
 
+void wl_ipc_trigger(void);
+
 #endif // __IPC_H__

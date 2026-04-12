@@ -14,5 +14,5 @@
 #define DATA_MEM_BASE  (WL_BASE + 0x00020000) // addressable from: core LSU, cluster bus (rw)
 #define CSR_BASE       (WL_BASE + 0x00040000) // addressable from: core LSU (rw)
 #define HWPE_CFG_BASE  (WL_BASE + 0x00080000) // addressable from: core LSU (rw)
-
+#define IPC_BASE       (WL_BASE + 0x00100000) // addressable from: core LSU (rw)
 #endif // __ADDR_MAP_H__

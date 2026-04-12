@@ -516,7 +516,7 @@ module wl_top
       .slv_rsp_o ( core_data_demux_ipc_rsp ),
       // Expose useful register to CROC
       .int_io ( int_io ),
-      int_ack_i ( int_ack_i  )
+      .int_ack_i ( int_ack_i  )
   );
 
   //////////////////////

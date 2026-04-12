@@ -34,6 +34,14 @@ HAL_SRC = $(wildcard $(WL_SW_DIR)/hal/*.c $(WL_SW_DIR)/hal/*.S)
 HAL_OBJ = $(patsubst %.c, %.o, $(HAL_SRC:.S=))
 RUNTIME_OBJ = $(HAL_OBJ) $(WL_SW_DIR)/runtime/crt0.o
 
+# For IPC test 
+# Convert binary to hex for JTAG loading
+%.instr_mem.hex: %.instr_mem.bin
+	$(OBJCOPY) -I binary -O verilog --change-addresses=0x20010000 $< $@
+
+%.data_mem.hex: %.data_mem.bin
+	$(OBJCOPY) -I binary -O verilog --change-addresses=0x20020000 $< $@
+
 # App sources
 APPS_SRC ?= $(wildcard $(WL_SW_DIR)/apps/*.c $(WL_SW_DIR)/apps/*.S)
 APPS_ELF = $(patsubst %.c, %.elf, $(APPS_SRC:.S=))
@@ -42,7 +50,10 @@ APPS_BIN_IMEM = $(patsubst %.elf, %.instr_mem.bin, $(APPS_ELF))
 APPS_BIN_DMEM  = $(patsubst %.elf, %.data_mem.bin, $(APPS_ELF))
 APPS_DUMP = $(patsubst %.elf, %.dump, $(APPS_ELF))
 
-all-sw: $(APPS_BIN_IMEM) $(APPS_BIN_DMEM) $(APPS_DUMP)
+APPS_HEX_IMEM = $(patsubst %.elf, %.instr_mem.hex, $(APPS_ELF))
+APPS_HEX_DMEM = $(patsubst %.elf, %.data_mem.hex, $(APPS_ELF))
+
+all-sw: $(APPS_BIN_IMEM) $(APPS_BIN_DMEM) $(APPS_HEX_IMEM) $(APPS_HEX_DMEM) $(APPS_DUMP)
 
 ##################
 # Snitch bootrom #
