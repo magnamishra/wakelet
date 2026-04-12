@@ -25,6 +25,10 @@ module wl_top
   input  axi_lite_resp_t axi_lite_mst_rsp_i,
   // Wake-up request to core
   input logic     irq_i,
+  // Interrupt to CROC
+  inout logic    int_io,
+  // Ack from CROC 
+  input logic    int_ack_i,  
   // End of computation and return value
   output logic [DataWidth-1:0] eoc_o,
   // AXI wide interface (slave port), for sensors
@@ -325,15 +329,25 @@ module wl_top
   // 0. Private data memory
   // 1. Top-level CSRs
   // 2. HWPE config
-  // 3. `core_data_demux` internally catches everything else routing to `core_data_demux_ext`
+  // 3. IPC 
+  // 4. `core_data_demux` internally catches everything else routing to `core_data_demux_ext`
 
-  localparam int CoreDataDemuxNumPorts = 4;
-  core_data_req_t core_data_demux_data_mem_req, core_data_demux_csr_req, core_data_demux_hwpe_req, core_data_demux_ext_req;
-  core_data_rsp_t core_data_demux_data_mem_rsp, core_data_demux_csr_rsp, core_data_demux_hwpe_rsp, core_data_demux_ext_rsp;
+  localparam int CoreDataDemuxNumPorts = 5;
+
+  core_data_req_t core_data_demux_data_mem_req, core_data_demux_csr_req, core_data_demux_hwpe_req, core_data_demux_ext_req, core_data_demux_ipc_req; 
+
+  core_data_rsp_t core_data_demux_data_mem_rsp, core_data_demux_csr_rsp, core_data_demux_hwpe_rsp, core_data_demux_ext_rsp, core_data_demux_ipc_rsp; 
 
   // CoreDataDemuxNumPorts-2 because the last port is the external port
   // used as "catch-all" rule, routing to ext all non-matched addresses
   localparam addr_napot_demux_rule_t [CoreDataDemuxNumPorts-2:0] CoreDataDemuxAddrMap = '{
+
+    '{ // IPC Interrupt
+        idx: 3,
+        base: IpcBaseAddr,
+        mask: ~(IpcOffset - 1)
+    },
+
     '{ // HWPE config
         idx: 2,
         base: HwpeCfgBaseAddr,
@@ -351,6 +365,8 @@ module wl_top
     }
   };
 
+  // match = (incoming_addr & mask) == (base & mask) 
+
   core_data_demux #(
     .NumPorts ( CoreDataDemuxNumPorts ),
     .req_t ( core_data_req_t ),
@@ -364,8 +380,8 @@ module wl_top
     .slv_req_i ( core_data_req ),
     .slv_rsp_o ( core_data_rsp ),
     // These arrays have to be the same order of CoreDataDemuxAddrMap (important: external port must be in the last index)
-    .mst_req_o ( {core_data_demux_ext_req, core_data_demux_hwpe_req, core_data_demux_csr_req, core_data_demux_data_mem_req} ),
-    .mst_rsp_i ( {core_data_demux_ext_rsp, core_data_demux_hwpe_rsp, core_data_demux_csr_rsp, core_data_demux_data_mem_rsp} )
+    .mst_req_o ( {core_data_demux_ext_req, core_data_demux_ipc_req,core_data_demux_hwpe_req, core_data_demux_csr_req, core_data_demux_data_mem_req } ),
+    .mst_rsp_i ( {core_data_demux_ext_rsp, core_data_demux_ipc_rsp,core_data_demux_hwpe_rsp, core_data_demux_csr_rsp, core_data_demux_data_mem_rsp } )
   );
 
   //////////////////////
@@ -486,6 +502,23 @@ module wl_top
     .eoc_o (eoc_o)
   );
 
+ //////////////
+ //   IPC   //
+ /////////////
+  wl_ipc #(
+      .NumRegs(IpcNumRegs),
+      .req_t( core_data_req_t ),
+      .rsp_t( core_data_rsp_t )
+  ) i_wl_ipc (
+      .clk_i ( clk_i ),
+      .rst_ni ( rst_ni ),
+      .slv_req_i ( core_data_demux_ipc_req ),
+      .slv_rsp_o ( core_data_demux_ipc_rsp ),
+      // Expose useful register to CROC
+      .int_io ( int_io ),
+      int_ack_i ( int_ack_i  )
+  );
+
   //////////////////////
   // Core instr demux //
   //////////////////////
@@ -602,6 +635,34 @@ module wl_top
   assign core_instr_demux_instr_mem_data = instr_mem_muxed_r_data;
   assign bus_instr_mem_r_data = instr_mem_muxed_r_data;
 
+  // Stream arbiter for read channel
+
+  // Cycle 1 
+  // Arbiter asserts instr_mem_muxed_r_en =1 
+  // core_instr moves to READ_AND_PERF in FSM
+  // SRAM starts and needs 1 cycle to complete 
+
+  // Cycle 2 
+  // SRAM has r.data ready 
+  // Till then  Arbiter needs to hold instr_mem_muxed_r_en =1 
+  // Arbiter sets instr_mem_muxed_r_en LOW 
+  // core_instr moves to WAIT_REQ
+  // r_valid is never high 
+
+  logic r_en_hold;
+  logic r_en_i_held; 
+
+  // Hack forces a hold when r_valid goes low in WAIT_REQ
+  // This doesn't solce the actual problem in FSM
+  // It only confirms that bridge works for both DMEM and IMEM 
+
+   always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) r_en_hold <= 1'b0;
+    else if (instr_mem_muxed_r_en) r_en_hold <= 1'b1;
+    else if (instr_mem_muxed_r_valid) r_en_hold <= 1'b0;
+  end
+  assign r_en_i_held = instr_mem_muxed_r_en | r_en_hold; 
+
   /* Instruction memory */
 
   core_instr_mem #(
@@ -613,7 +674,7 @@ module wl_top
     // R/W request grant (always 1 here)
     .rw_gnt_o ( bus_instr_mem_rw_gnt ),
     // Read port
-    .r_en_i ( instr_mem_muxed_r_en ),
+    .r_en_i   (  r_en_i_held  ),
     .r_addr_i ( instr_mem_muxed_r_addr ),
     .r_data_o ( instr_mem_muxed_r_data ),
     .r_valid_o ( instr_mem_muxed_r_valid ),

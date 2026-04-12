@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+// Magna Mishra < Expand wakelet's memory map to introduce extra registers >
 
 `include "axi/typedef.svh"
 `include "reqrsp_interface/typedef.svh"
@@ -46,6 +47,20 @@ package wl_pkg;
   localparam int ActMemNumBanks = 16;
   localparam int ActMemNumBankWords = 128;
   localparam int ActMemWordWidth = DataWidth;
+  
+  //IPC
+  localparam int IpcNumRegs = 4;
+  localparam int IpcNumBytes = IpcNumRegs * (DataWidth / 8);
+
+  // Memory map
+  // Bootroom - 0x0000_0000
+  // InstrMem - 0x0001_0000
+  // DataMem  - 0x0002_0000
+  // CSRs     - 0x0004_0000
+  // HWPE Cfg - 0x0008_0000
+  // IPC INT  - 0x0010_0000
+
+
 
   ///////////
   // Types //
@@ -110,5 +125,8 @@ package wl_pkg;
 
   localparam axi_addr_t HwpeCfgBaseAddr = BaseAddress + 32'h0008_0000; // addressable from: core LSU (rw)
   localparam axi_addr_t HwpeCfgOffset = HwpeCfgNumBytes;
+
+  localparam axi_addr_t IpcBaseAddr = BaseAddress + 32'h0010_0000; // addressable from: core LSU (rw)
+  localparam axi_addr_t IpcOffset = IpcNumBytes;
 
 endpackage
