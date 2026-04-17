@@ -5,7 +5,7 @@
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
 
 module wl_registers #(
-  parameter int unsigned NumRegs = 1,
+  parameter int unsigned NumRegs = 1, //update to 3 in wl_pkg.sv,  more registers for wakelet completion and wakeup
   parameter type req_t = logic,
   parameter type rsp_t = logic,
   // Hardcoded parameters, do not modify
@@ -16,7 +16,9 @@ module wl_registers #(
   input  req_t slv_req_i,
   output rsp_t slv_rsp_o,
   // Expose useful registers
-  output logic [DataWidth-1:0] eoc_o
+  output logic [DataWidth-1:0] eoc_o,
+  output logic int_trig_o, //wakelet up, exposed to crossbar
+  output logic wakelet_done_o  //wakelet done, CROC's ext_irq_i
 );
 
   localparam int unsigned IdxWidth = (NumRegs > 1) ? $clog2(NumRegs) : 1;
@@ -31,8 +33,12 @@ module wl_registers #(
    *  Offset | Index | Description
    * --------|-------|--------------------------
    *    0x00 |     0 | EOC (End of computation)
+   *    0x04 |     1 | INT_TRIG_O (wakelet up, exposed to bridge)
+   *    0x08 |     2 | WAKELET_DONE_O (wakelet done, ext_irq_i for CROC)
    */
-  assign eoc_o = regfile_q[0];
+  assign eoc_o          = regfile_q[0];
+  assign int_trig_o     = regfile_q[1][0];
+  assign wakelet_done_o = regfile_q[2][0];
 
   assign rf_idx = slv_req_i.q.addr[IdxWidth+BytesOffset-1:BytesOffset];
 

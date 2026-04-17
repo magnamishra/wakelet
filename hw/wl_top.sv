@@ -24,21 +24,15 @@ module wl_top
   output axi_lite_req_t  axi_lite_mst_req_o,
   input  axi_lite_resp_t axi_lite_mst_rsp_i,
   // Wake-up request to core
-  input logic     irq_i,
-  // Interrupt to CROC
-  inout logic    int_io,
-  // Ack from CROC 
-  input logic    int_ack_i,  
+  input logic     irq_i, 
   // End of computation and return value
+  output logic int_trig_o,      //exposed to bridge 
+  output logic wakelet_done_o, //ext_irq to CROC 
   output logic [DataWidth-1:0] eoc_o,
   // AXI wide interface (slave port), for sensors
   input  axi_req_t  axi_wide_slv_req_i,
   output axi_resp_t axi_wide_slv_rsp_o
 );
-
-  initial begin 
-    $display ("[WAKELET] BaseOffset = 0x%h", BaseOffset); 
-  end 
 
   ////////////////////////
   // AXI Lite interface //
@@ -329,24 +323,18 @@ module wl_top
   // 0. Private data memory
   // 1. Top-level CSRs
   // 2. HWPE config
-  // 3. IPC 
-  // 4. `core_data_demux` internally catches everything else routing to `core_data_demux_ext`
+  // 3. `core_data_demux` internally catches everything else routing to `core_data_demux_ext`
 
-  localparam int CoreDataDemuxNumPorts = 5;
+  localparam int CoreDataDemuxNumPorts = 4;
 
-  core_data_req_t core_data_demux_data_mem_req, core_data_demux_csr_req, core_data_demux_hwpe_req, core_data_demux_ext_req, core_data_demux_ipc_req; 
+  core_data_req_t core_data_demux_data_mem_req, core_data_demux_csr_req, core_data_demux_hwpe_req, core_data_demux_ext_req;
 
-  core_data_rsp_t core_data_demux_data_mem_rsp, core_data_demux_csr_rsp, core_data_demux_hwpe_rsp, core_data_demux_ext_rsp, core_data_demux_ipc_rsp; 
+  core_data_rsp_t core_data_demux_data_mem_rsp, core_data_demux_csr_rsp, core_data_demux_hwpe_rsp, 
+  core_data_demux_ext_rsp;
 
   // CoreDataDemuxNumPorts-2 because the last port is the external port
   // used as "catch-all" rule, routing to ext all non-matched addresses
   localparam addr_napot_demux_rule_t [CoreDataDemuxNumPorts-2:0] CoreDataDemuxAddrMap = '{
-
-    '{ // IPC Interrupt
-        idx: 3,
-        base: IpcBaseAddr,
-        mask: ~(IpcOffset - 1)
-    },
 
     '{ // HWPE config
         idx: 2,
@@ -380,8 +368,8 @@ module wl_top
     .slv_req_i ( core_data_req ),
     .slv_rsp_o ( core_data_rsp ),
     // These arrays have to be the same order of CoreDataDemuxAddrMap (important: external port must be in the last index)
-    .mst_req_o ( {core_data_demux_ext_req, core_data_demux_ipc_req,core_data_demux_hwpe_req, core_data_demux_csr_req, core_data_demux_data_mem_req } ),
-    .mst_rsp_i ( {core_data_demux_ext_rsp, core_data_demux_ipc_rsp,core_data_demux_hwpe_rsp, core_data_demux_csr_rsp, core_data_demux_data_mem_rsp } )
+    .mst_req_o ( {core_data_demux_ext_req, core_data_demux_hwpe_req, core_data_demux_csr_req, core_data_demux_data_mem_req } ),
+    .mst_rsp_i ( {core_data_demux_ext_rsp,core_data_demux_hwpe_rsp, core_data_demux_csr_rsp, core_data_demux_data_mem_rsp } )
   );
 
   //////////////////////
@@ -488,6 +476,8 @@ module wl_top
   /////////////////
   // Top regfile //
   /////////////////
+  logic csr_int_trig_o;
+  logic csr_wakelet_done_o;
 
   wl_registers #(
     .NumRegs ( CsrNumRegs ),
@@ -499,25 +489,13 @@ module wl_top
     .slv_req_i ( core_data_demux_csr_req ),
     .slv_rsp_o ( core_data_demux_csr_rsp ),
     // Exposed registers
+    .int_trig_o (csr_int_trig_o),
+    .wakelet_done_o (csr_wakelet_done_o), 
     .eoc_o (eoc_o)
   );
 
- //////////////
- //   IPC   //
- /////////////
-  wl_ipc #(
-      .NumRegs(IpcNumRegs),
-      .req_t( core_data_req_t ),
-      .rsp_t( core_data_rsp_t )
-  ) i_wl_ipc (
-      .clk_i ( clk_i ),
-      .rst_ni ( rst_ni ),
-      .slv_req_i ( core_data_demux_ipc_req ),
-      .slv_rsp_o ( core_data_demux_ipc_rsp ),
-      // Expose useful register to CROC
-      .int_io ( int_io ),
-      .int_ack_i ( int_ack_i  )
-  );
+  assign int_trig_o       =  csr_int_trig_o;
+  assign wakelet_done_o   =  csr_wakelet_done_o; 
 
   //////////////////////
   // Core instr demux //

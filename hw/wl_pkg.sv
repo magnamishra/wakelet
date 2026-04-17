@@ -35,7 +35,7 @@ package wl_pkg;
   localparam int DataMemAddrWidth = (DataMemNumBytes > 1) ? $clog2(DataMemNumBytes) : 1;
 
   // CSRs
-  localparam int CsrNumRegs = 1;
+  localparam int CsrNumRegs = 3;
   localparam int CsrNumBytes = CsrNumRegs * (DataWidth / 8);
 
   // HWPE Config
@@ -48,9 +48,6 @@ package wl_pkg;
   localparam int ActMemNumBankWords = 128;
   localparam int ActMemWordWidth = DataWidth;
   
-  //IPC
-  localparam int IpcNumRegs = 4;
-  localparam int IpcNumBytes = IpcNumRegs * (DataWidth / 8);
 
   // Memory map
   // Bootroom - 0x0000_0000
@@ -58,7 +55,6 @@ package wl_pkg;
   // DataMem  - 0x0002_0000
   // CSRs     - 0x0004_0000
   // HWPE Cfg - 0x0008_0000
-  // IPC INT  - 0x0010_0000
 
 
 
@@ -125,8 +121,5 @@ package wl_pkg;
 
   localparam axi_addr_t HwpeCfgBaseAddr = BaseAddress + 32'h0008_0000; // addressable from: core LSU (rw)
   localparam axi_addr_t HwpeCfgOffset = HwpeCfgNumBytes;
-
-  localparam axi_addr_t IpcBaseAddr = BaseAddress + 32'h0010_0000; // addressable from: core LSU (rw)
-  localparam axi_addr_t IpcOffset = IpcNumBytes;
 
 endpackage
