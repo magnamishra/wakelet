@@ -14,7 +14,7 @@
 #include <addr_map.h>
 
 int main(void) {
-    // Trigger interrupt to CROC ? signal it to go to sleep
+    *(volatile uint32_t *)(CSR_BASE + 0x04) = 0x1;
     *(volatile uint32_t *)(CSR_BASE + 0x08) = 0x1;
     return 0;
 }
