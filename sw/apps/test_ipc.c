@@ -11,11 +11,10 @@
  */
 
 #include <stdint.h>
-#include <ipc.h>
+#include <addr_map.h>
 
 int main(void) {
     // Trigger interrupt to CROC ? signal it to go to sleep
-    wl_ipc_trigger();
-    
+    *(volatile uint32_t *)(CSR_BASE + 0x08) = 0x1;
     return 0;
 }

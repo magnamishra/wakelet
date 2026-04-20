@@ -33,7 +33,6 @@ sources:
   - hw/core_subsystem.sv
   - hw/wl_registers.sv
   - hw/adapter_axi2hci.sv
-  - hw/wl_ipc.sv
   # Level 1
   - hw/hwpe_subsystem.sv
   # Level 2
