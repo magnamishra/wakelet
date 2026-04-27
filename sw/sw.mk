@@ -93,7 +93,7 @@ $(WL_SW_DIR)/bootrom/snitch_bootrom.elf: $(WL_SW_DIR)/bootrom/snitch_bootrom.ld 
 # Linker scripts
 .PRECIOUS: %.ld
 %.ld: %.ld.c
-	$(CC) $(WL_SW_INCL) -P -E $< -o $@
+	$(CC) $(WL_SW_INCL) $(WL_SW_HWDEFS) -P -E $< -o $@
 
 ##################################
 # Separate binaries for flashing #
