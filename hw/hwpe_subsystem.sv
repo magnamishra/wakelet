@@ -15,6 +15,7 @@ module hwpe_subsystem
   parameter int unsigned ExtElemWidth = 8,
   parameter int unsigned WidePortFact = 4,
   parameter int unsigned PeriphIdWidth = 0,
+  parameter logic [31:0] BaseOffset = 32'h0,
   // Activation memory
   parameter int unsigned ActMemNumBanks = 16,
   parameter int unsigned ActMemNumBankWords = 128,
@@ -122,6 +123,7 @@ module hwpe_subsystem
   `HCI_INTF(hwpe_nqmem_tcdm, clk_i);
 
   hwpe_param_mem_sys #(
+    .BaseOffset                        (  BaseOffset                      ),
     .`HCI_SIZE_PARAM(hwpe_wmem_tcdm)   ( `HCI_SIZE_PARAM(hwpe_wmem_tcdm)  ),
     .`HCI_SIZE_PARAM(hwpe_nqmem_tcdm)  ( `HCI_SIZE_PARAM(hwpe_nqmem_tcdm) )
   ) i_hwpe_param_mem_sys (

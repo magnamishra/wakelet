@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Arpan Suravi Prasad <prasadar@iis.ee.ethz.ch>
+// Magna Mishra        <Integrate wakelet with croc>
 
 // This takes the initialization from the AXI interface and initializes weight and threshold memory
-
+// Add baseoffset parameter
 
 `include "common_cells/registers.svh"
 `include "hci_helpers.svh"
@@ -13,6 +14,7 @@ module hwpe_param_mem_sys
   import wl_pkg::*;
   import hci_package::hci_size_parameter_t;
 #(
+  parameter logic [31:0] BaseOffset = 32'h0, //for Wakelet with Croc
   parameter hci_size_parameter_t `HCI_SIZE_PARAM(hwpe_wmem_tcdm) = '0,
   parameter hci_size_parameter_t `HCI_SIZE_PARAM(hwpe_nqmem_tcdm)= '0
 )(
@@ -56,6 +58,10 @@ axi_to_mem_intf #(
   .mem_rdata_i  ( '0 )
 );
 
+// Remap address - strip BaseOffset
+logic [AxiLiteAddrWidth-1:0] bus_param_mem_addr_remap;
+assign bus_param_mem_addr_remap = bus_param_mem_addr - BaseOffset;
+
 logic wmem_addr_range;
 logic nqmem_addr_range;
 
@@ -73,8 +79,8 @@ logic [AxiLiteDataWidth-1:0] nqmem_wdata;
 logic [HwpeNqmemNumBanks-1:0][HwpeNqmemBankAddrWidth-1:0] nqmem_raddr;
 logic [HwpeNqmemNumBanks-1:0][HwpeNqmemDataWidth-1:0]     nqmem_rdata;
 
-assign wmem_addr_range  = (bus_param_mem_addr >= HwpeWmemBaseAddr)  && (bus_param_mem_addr < HwpeWmemBaseAddr+HwpeWmemOffset); 
-assign nqmem_addr_range = (bus_param_mem_addr >= HwpeNqmemBaseAddr) && (bus_param_mem_addr < HwpeNqmemBaseAddr+HwpeNqmemOffset); 
+assign wmem_addr_range  = (bus_param_mem_addr_remap >= HwpeWmemBaseAddr)  && (bus_param_mem_addr_remap < HwpeWmemBaseAddr+HwpeWmemOffset); 
+assign nqmem_addr_range = (bus_param_mem_addr_remap >= HwpeNqmemBaseAddr) && (bus_param_mem_addr_remap < HwpeNqmemBaseAddr+HwpeNqmemOffset); 
 assign bus_param_mem_rw_gnt = ~( wmem_ren | nqmem_ren ) & ( wmem_addr_range | nqmem_addr_range );
 
 
@@ -100,7 +106,7 @@ hwpe_param_mem #(
 
 assign wmem_ren   = hwpe_wmem_tcdm.req & hwpe_wmem_tcdm.gnt;
 assign wmem_wen   = wmem_addr_range & bus_param_mem_req & bus_param_mem_we & ~wmem_ren; 
-assign wmem_waddr = bus_param_mem_addr; 
+assign wmem_waddr = bus_param_mem_addr_remap; 
 assign wmem_wdata = bus_param_mem_w_data;
 assign hwpe_wmem_tcdm.gnt     = 1'b1;
 assign hwpe_wmem_tcdm.r_valid = wmem_ren_q;
@@ -132,7 +138,7 @@ hwpe_param_mem #(
 
 assign nqmem_ren   = hwpe_nqmem_tcdm.req & hwpe_nqmem_tcdm.gnt;
 assign nqmem_wen   = nqmem_addr_range & bus_param_mem_req & bus_param_mem_we & ~nqmem_ren; 
-assign nqmem_waddr = bus_param_mem_addr; 
+assign nqmem_waddr = bus_param_mem_addr_remap; 
 assign nqmem_wdata = bus_param_mem_w_data;
 assign hwpe_nqmem_tcdm.gnt     = 1'b1;
 assign hwpe_nqmem_tcdm.r_valid = nqmem_ren_q;
