@@ -3,8 +3,10 @@
 # SPDX-License-Identifier: SHL-0.51
 #
 # Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+# Add config.mk for HWPE integration
 
 include bender.mk
+include config.mk
 
 WL_ROOT = $(shell pwd)
 
