@@ -755,7 +755,8 @@ module wl_top
     .axi_ar_chan_t ( axi_ar_chan_t ),
     .axi_r_chan_t ( axi_r_chan_t ),
     .axi_req_t ( axi_req_t ),
-    .axi_resp_t ( axi_resp_t )
+    .axi_resp_t ( axi_resp_t ),
+    .BaseOffset ( BaseOffset )
   ) i_hwpe_subsystem (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
