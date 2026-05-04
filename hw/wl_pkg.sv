@@ -113,7 +113,7 @@ package wl_pkg;
   localparam int ActMemElemWidth = `ifdef ACT_MEM_ELEMWIDTH `ACT_MEM_ELEMWIDTH `else 0 `endif;
   localparam int ActMemWordWidth = ActMemElemWidth * ActMemNumElemWord;
   // HWPE
-  localparam int HwpeDataWidthFact = 8;
+  localparam int HwpeDataWidthFact = `ifdef HWPE_ELEMWIDTH_FACT `HWPE_ELEMWIDTH_FACT `else 8 `endif;
   localparam int HwpeDataWidth = ActMemElemWidth * HwpeDataWidthFact;
  
   localparam int unsigned HwpeWmemNumBanks = 1;

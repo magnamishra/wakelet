@@ -4,6 +4,7 @@
 //
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
 // Arpan Suravi Prasad <prasadar@iis.ee.ethz.ch>
+// Magna Mishra < integrate data mover modifications > 
 
 `include "hci_helpers.svh"
 
@@ -16,6 +17,7 @@ module hwpe_subsystem
   parameter int unsigned WidePortFact = 4,
   parameter int unsigned PeriphIdWidth = 0,
   parameter logic [31:0] BaseOffset = 32'h0,
+  parameter int unsigned PIXEL_DIFF_THRESHOLD = 100,  
   // Activation memory
   parameter int unsigned ActMemNumBanks = 16,
   parameter int unsigned ActMemNumBankWords = 128,
@@ -42,6 +44,7 @@ module hwpe_subsystem
   // Sensor interface (AXI slave)
   input  axi_req_t  axi_slv_req_i,
   output axi_resp_t axi_slv_rsp_o,
+  output logic pixel_wakeup_o, 
   // Parameter Initialization 
   AXI_BUS           axi_param_mem,
   // Peripheral slave port
@@ -236,7 +239,8 @@ module hwpe_subsystem
   // ExtDataWidth and ExtAddrWidth hardcoded to 32
   datamover_top_wrap #(
     .MP ( WidePortFact ),
-    .ID ( PeriphIdWidth )
+    .ID ( PeriphIdWidth ),
+    .PIXEL_DIFF_THRESHOLD ( PIXEL_DIFF_THRESHOLD )
   ) i_datamover_top_wrap (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
@@ -259,9 +263,10 @@ module hwpe_subsystem
     .periph_be ( periph_slave.be ),
     .periph_data ( periph_slave.data ),
     .periph_id ( periph_slave.id ),
-    .periph_r_data ( periph_slave.r_data ),
-    .periph_r_valid ( periph_slave.r_valid ),
-    .periph_r_id ( periph_slave.r_id )
+    .periph_r_data   ( periph_slave.r_data ),
+    .periph_r_valid  ( periph_slave.r_valid ),
+    .periph_r_id     ( periph_slave.r_id ),
+    .pixel_wakeup_o  ( pixel_wakeup_o )
   );
 
   ///////////////////////

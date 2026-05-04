@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: SHL-0.51
 #
 # Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+# Magna Mishra   < add construct to make PIXEL_DIFF_THRESHOLD compile time parametrizable > 
 
 # Possible values:
 # - scm: standard-cell-based memory
@@ -15,6 +16,7 @@ ACT_MEM_TYPE ?= scm
 DATA_MEM_NUMWORDS ?= 128
 INSTR_MEM_NUMWORDS ?= 128
 
+
 # Activation memory:
 # The memory is structured as ACT_MEM_NUMBANKS banks with ACT_MEM_NUMBANKWORDS
 # each. The bank words have a width of ACT_MEM_NUMELEMWORD * ACT_MEM_ELEMWIDTH
@@ -26,11 +28,13 @@ ACT_MEM_NUMELEMWORD ?= 1 # power of 2
 ACT_MEM_ELEMWIDTH ?= 32 # in bits
 
 # HWPE Subsystem:
+PIXEL_DIFF_THRESHOLD ?= 100
 # HWPE_ELEMWIDTH_FACT determines the width (in bits) of the HWPE memory accesses
 # (to the activation memory), and also of the AXI interface dedicated to sensors.
 # Such width is equal to HWPE_ELEMWIDTH_FACT * ACT_MEM_ELEMWIDTH.
 
-HWPE_ELEMWIDTH_FACT ?= 8
+HW_CFG_DEFS += -D HWPE_ELEMWIDTH_FACT=$(HWPE_ELEMWIDTH_FACT)
+HW_CFG_DEFS += -D PIXEL_DIFF_THRESHOLD=$(PIXEL_DIFF_THRESHOLD)
 
 
 #########################

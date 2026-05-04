@@ -8,10 +8,18 @@
 
 /*
    Changes incorporated from prasadar/devel 
-   1. update AXI ports from axi_wide to axi_addr_
+   1. Update AXI ports from axi_wide to axi_addr_
    2. Update Address offsets to accomodate HWPE in memory map
    3. Update ClusterBus map 
 */
+
+/*
+   Changes incorporated for data mover engine  
+   1. Pass PIXEL_DIFF_THRESHOLD 
+   2. Update core subsystem interrupt 
+      2.1 MEIP is now "or" of data mover engine's pixel_wakeup & trigger from Croc  
+*/
+
 
 `include "axi/assign.svh"
 `include "reqrsp_interface/typedef.svh"
@@ -20,8 +28,8 @@
 module wl_top
   import wl_pkg::*;
 #(
-  // Adding to debug core hang issue
-  parameter logic [31:0] BaseOffset= 32'h0
+  parameter logic [31:0] BaseOffset= 32'h0,
+  parameter int unsigned PIXEL_DIFF_THRESHOLD = 100
 )(
   input logic     clk_i,
   input logic     rst_ni,
@@ -32,7 +40,7 @@ module wl_top
   output axi_lite_req_t  axi_lite_mst_req_o,
   input  axi_lite_resp_t axi_lite_mst_rsp_i,
   // Wake-up request to core
-  input logic     irq_i, 
+  input logic     irq_i,    
   // End of computation and return value
   output logic int_trig_o,      //exposed to bridge 
   output logic wakelet_done_o, //ext_irq to CROC 
@@ -337,6 +345,13 @@ module wl_top
   core_data_req_t core_data_req;
   core_data_rsp_t core_data_rsp;
 
+  // Interrupt management 
+  // pixel threshold indication 
+  logic  pixel_wakeup_i;
+  logic core_irq_meip_i; 
+  
+  assign core_irq_meip_i = pixel_wakeup_i | irq_i ; 
+
   core_subsystem #(
     .AddrWidth ( AddrWidth ),
     .DataWidth ( DataWidth ),
@@ -346,7 +361,7 @@ module wl_top
   ) i_core_subsystem (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
-    .irq_meip_i ( irq_i ),
+    .irq_meip_i  ( core_irq_meip_i ),
     .inst_addr_o ( core_instr_addr ),
     .inst_data_i ( core_instr_data ),
     .inst_valid_o ( core_instr_valid ),
@@ -756,14 +771,16 @@ module wl_top
     .axi_r_chan_t ( axi_r_chan_t ),
     .axi_req_t ( axi_req_t ),
     .axi_resp_t ( axi_resp_t ),
-    .BaseOffset ( BaseOffset )
+    .BaseOffset ( BaseOffset ),
+    .PIXEL_DIFF_THRESHOLD ( PIXEL_DIFF_THRESHOLD )
   ) i_hwpe_subsystem (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
-    .axi_slv_req_i ( axi_slv_req_i ),
-    .axi_slv_rsp_o ( axi_slv_rsp_o ),
-    .axi_param_mem ( axi_param_mem ),
-    .periph_slave ( periph_hwpe_if )
+    .pixel_wakeup_o ( pixel_wakeup_i ),
+    .axi_slv_req_i  ( axi_slv_req_i ),
+    .axi_slv_rsp_o  ( axi_slv_rsp_o ),
+    .axi_param_mem  ( axi_param_mem ),
+    .periph_slave   ( periph_hwpe_if )
   );
 
 endmodule
