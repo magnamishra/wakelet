@@ -15,9 +15,9 @@
 
 /*
    Changes incorporated for data mover engine  
-   1. Pass PIXEL_DIFF_THRESHOLD 
+   1. Pass PIXEL_DIFF_THRESHOLD into reg_file.generic_params 
    2. Update core subsystem interrupt 
-      2.1 MEIP is now "or" of data mover engine's pixel_wakeup & trigger from Croc  
+      2.1 Add extra pin to connect interrupt from datamover to Snitch via core subsystem 
 */
 
 
@@ -28,8 +28,7 @@
 module wl_top
   import wl_pkg::*;
 #(
-  parameter logic [31:0] BaseOffset= 32'h0,
-  parameter int unsigned PIXEL_DIFF_THRESHOLD = 100
+  parameter logic [31:0] BaseOffset= 32'h0
 )(
   input logic     clk_i,
   input logic     rst_ni,
@@ -345,12 +344,8 @@ module wl_top
   core_data_req_t core_data_req;
   core_data_rsp_t core_data_rsp;
 
-  // Interrupt management 
-  // pixel threshold indication 
-  logic  pixel_wakeup_i;
-  logic core_irq_meip_i; 
-  
-  assign core_irq_meip_i = pixel_wakeup_i | irq_i ; 
+  //HWPE interrupt 
+  logic pixel_wakeup; 
 
   core_subsystem #(
     .AddrWidth ( AddrWidth ),
@@ -361,7 +356,8 @@ module wl_top
   ) i_core_subsystem (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
-    .irq_meip_i  ( core_irq_meip_i ),
+    .irq_meip_i  ( irq_i ),
+    .irq_mxip_i  ( pixel_wakeup ), 
     .inst_addr_o ( core_instr_addr ),
     .inst_data_i ( core_instr_data ),
     .inst_valid_o ( core_instr_valid ),
@@ -772,11 +768,12 @@ module wl_top
     .axi_req_t ( axi_req_t ),
     .axi_resp_t ( axi_resp_t ),
     .BaseOffset ( BaseOffset ),
-    .PIXEL_DIFF_THRESHOLD ( PIXEL_DIFF_THRESHOLD )
+    //Hard coded here : Wakelet only has 1 core - Snitch 
+    .N_CORES    (1)
   ) i_hwpe_subsystem (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
-    .pixel_wakeup_o ( pixel_wakeup_i ),
+    .pixel_wakeup_o ( pixel_wakeup ),
     .axi_slv_req_i  ( axi_slv_req_i ),
     .axi_slv_rsp_o  ( axi_slv_rsp_o ),
     .axi_param_mem  ( axi_param_mem ),

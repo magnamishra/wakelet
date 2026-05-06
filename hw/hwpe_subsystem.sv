@@ -9,7 +9,8 @@
 `include "hci_helpers.svh"
 
 module hwpe_subsystem 
-  import wl_pkg::*;
+  import wl_pkg::*; 
+  import hwpe_ctrl_package::*;
 #(
   parameter int unsigned ExtDataWidth = 32,
   parameter int unsigned ExtAddrWidth = 32,
@@ -17,7 +18,8 @@ module hwpe_subsystem
   parameter int unsigned WidePortFact = 4,
   parameter int unsigned PeriphIdWidth = 0,
   parameter logic [31:0] BaseOffset = 32'h0,
-  parameter int unsigned PIXEL_DIFF_THRESHOLD = 100,  
+  //Add parameter for passing evt_o
+  parameter int unsigned N_CORES =  2,                      
   // Activation memory
   parameter int unsigned ActMemNumBanks = 16,
   parameter int unsigned ActMemNumBankWords = 128,
@@ -237,15 +239,20 @@ module hwpe_subsystem
 
   // inside datamover_top_wrap:
   // ExtDataWidth and ExtAddrWidth hardcoded to 32
+
+  logic [N_CORES-1:0][REGFILE_N_EVT-1:0] evt;
+  assign pixel_wakeup_o = evt [0][1] ; //Snitch is always core 0
+
+
   datamover_top_wrap #(
     .MP ( WidePortFact ),
     .ID ( PeriphIdWidth ),
-    .PIXEL_DIFF_THRESHOLD ( PIXEL_DIFF_THRESHOLD )
+    .N_CORES ( N_CORES)
   ) i_datamover_top_wrap (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
     .test_mode_i ( 1'b0 ),
-    .evt_o ( /* Unconneccted */ ),
+    .evt_o       ( evt ),
     // TCDM interface, to bind to HCI interface
     .tcdm_req ( tcdm_req ),
     .tcdm_gnt ( tcdm_gnt ),
@@ -265,8 +272,8 @@ module hwpe_subsystem
     .periph_id ( periph_slave.id ),
     .periph_r_data   ( periph_slave.r_data ),
     .periph_r_valid  ( periph_slave.r_valid ),
-    .periph_r_id     ( periph_slave.r_id ),
-    .pixel_wakeup_o  ( pixel_wakeup_o )
+    .periph_r_id     ( periph_slave.r_id )
+
   );
 
   ///////////////////////

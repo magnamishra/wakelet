@@ -28,7 +28,6 @@ ACT_MEM_NUMELEMWORD ?= 1 # power of 2
 ACT_MEM_ELEMWIDTH ?= 32 # in bits
 
 # HWPE Subsystem:
-PIXEL_DIFF_THRESHOLD ?= 100
 # HWPE_ELEMWIDTH_FACT determines the width (in bits) of the HWPE memory accesses
 # (to the activation memory), and also of the AXI interface dedicated to sensors.
 # Such width is equal to HWPE_ELEMWIDTH_FACT * ACT_MEM_ELEMWIDTH.

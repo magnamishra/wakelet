@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+// Magna Mishra < bring mxip interrupt from Snitch to Wakelet top level > 
 
 module core_subsystem #(
   parameter int unsigned AddrWidth = 32,
@@ -14,6 +15,7 @@ module core_subsystem #(
   input  logic                 clk_i,
   input  logic                 rst_ni,
   input  logic                 irq_meip_i,
+  input  logic                 irq_mxip_i, 
   output logic [AddrWidth-1:0] inst_addr_o,
   input  logic [31:0]          inst_data_i,
   output logic                 inst_valid_o,
@@ -43,6 +45,7 @@ module core_subsystem #(
   always_comb begin : core_irq_binding
     core_irq = '0;
     core_irq.meip = irq_meip_i;
+    core_irq.mxip = irq_mxip_i; 
   end
 
   // Snitch core (minimal instance)
