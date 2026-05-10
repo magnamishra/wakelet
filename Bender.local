@@ -1,0 +1,5 @@
+overrides:
+  axi: { git: "https://github.com/pulp-platform/axi.git", version: "=0.39.9" }
+  hci: { git: "https://github.com/pulp-platform/hci.git", version: "=2.3.0" }
+  register_interface: { git: "https://github.com/pulp-platform/register_interface.git", version: "=0.4.7" }
+  snitch_cluster: { git: "https://github.com/pulp-platform/snitch_cluster.git", rev: d602aad  } # branch: main

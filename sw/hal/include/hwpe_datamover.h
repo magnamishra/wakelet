@@ -4,6 +4,7 @@
 //
 // Francesco Conti <f.conti@unibo.it>
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+// Magna Mishra   < Update generic parameters for runtime config >
 
 #include <stdio.h>
 
@@ -27,15 +28,14 @@
  */
 
 // offset wrt HWPE_CFG_BASE
-#define DATAMOVER_COMMIT_AND_TRIGGER 0x00  // Trigger commit
-#define DATAMOVER_ACQUIRE            0x04  // Acquire command
-#define DATAMOVER_FINISHED           0x08  // Finished signal
-#define DATAMOVER_STATUS             0x0c  // Status register
-#define DATAMOVER_RUNNING_JOB        0x10  // Running job ID
-#define DATAMOVER_SOFT_CLEAR         0x14  // Soft clear
-#define DATAMOVER_SWSYNC             0x18  // Software synchronization
-#define DATAMOVER_URISCY_IMEM        0x1c  // uRISCy instruction memory
-
+#define DATAMOVER_COMMIT_AND_TRIGGER   0x00  // Trigger commit
+#define DATAMOVER_ACQUIRE              0x04  // Acquire command
+#define DATAMOVER_FINISHED             0x08  // Finished signal
+#define DATAMOVER_STATUS               0x0c  // Status register
+#define DATAMOVER_RUNNING_JOB          0x10  // Running job ID
+#define DATAMOVER_SOFT_CLEAR           0x14  // Soft clear
+#define DATAMOVER_SWSYNC               0x18  // Software synchronization
+#define DATAMOVER_URISCY_IMEM          0x1c  // uRISCy instruction memory
 // command register functions
 #define DATAMOVER_WRITE_CMD(offset, value)        *(uint32_t volatile *)(HWPE_CFG_BASE + offset) = value
 #define DATAMOVER_WRITE_CMD_BE(offset, value, be) *(uint8_t volatile *)(HWPE_CFG_BASE + offset + be) = value
@@ -56,6 +56,9 @@
 #define DATAMOVER_REGISTER_OFFS      0x40   // Register base offset
 #define DATAMOVER_REGISTER_CXT0_OFFS 0x80   // Context 0 offset
 #define DATAMOVER_REGISTER_CXT1_OFFS 0x120  // Context 1 offset
+/// Offset mapping derived from hwpe_ctrl_slave.sv and hwpe_ctrl_package.sv 
+/// Maps to generic_params[0] 
+#define DATAMOVER_REG_GENERIC_PARAMS_0 0x20  // Pixel Difference Threshold 
 
 // offset wrt HWPE_CFG_BASE + DATAMOVER_REGISTER_(OFFS|CXT0_OFFS|CXT1_OFFS)
 //NOTE: All addresses/dimensions are given in bytes
@@ -85,5 +88,6 @@
 #define DATAMOVER_WRITE_REG_CXT1(offset, value)        *(uint32_t volatile *)(HWPE_CFG_BASE + DATAMOVER_REGISTER_CXT1_OFFS + offset) = value
 #define DATAMOVER_WRITE_REG_CXT1_BE(offset, value, be) *(uint8_t volatile *)(HWPE_CFG_BASE + DATAMOVER_REGISTER_CXT1_OFFS + offset + be) = value
 #define DATAMOVER_READ_REG_CXT1(offset)                ret = (*(uint32_t volatile *)(HWPE_CFG_BASE + DATAMOVER_REGISTER_CXT1_OFFS + offset))
+#define DATAMOVER_WRITE_GENERIC_PARAM(offset, value) *(uint32_t volatile *)(HWPE_CFG_BASE + DATAMOVER_REGISTER_OFFS + offset) = value
 
 #endif /* __HWPE_DATAMOVER_H__ */

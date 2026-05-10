@@ -126,7 +126,6 @@ module hwpe_param_mem #(
       .DATA_WIDTH  ( HwpeDataWidth  )
     ) i_param_scm (
       .clk         ( clk_i           ),
-      .rst_n       ( rst_ni          ),
       .ReadEnable  ( rd_en_i         ),
       .ReadAddr    ( raddr_i[bank]  ),
       .ReadData    ( rdata_o[bank]  ),

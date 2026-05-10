@@ -74,7 +74,7 @@ module core_subsystem #(
     .XFVEC ( 0 ),
     .XFDOTP ( 0 ),
     .XFAUX ( 0 ),
-    .Xipu ( 0 ),
+    .Xipu  ( 0 ), 
     // Disable VM support
     .VMSupport ( 0 ),
     .NumDTLBEntries ( 0 ),

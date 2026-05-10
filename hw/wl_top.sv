@@ -12,12 +12,17 @@
    2. Update Address offsets to accomodate HWPE in memory map
    3. Update ClusterBus map 
 */
-
 /*
    Changes incorporated for data mover engine  
    1. Pass PIXEL_DIFF_THRESHOLD into reg_file.generic_params 
    2. Update core subsystem interrupt 
       2.1 Add extra pin to connect interrupt from datamover to Snitch via core subsystem 
+*/
+/*
+   Changes for latest snitch version (reverted)
+   1. Update reqrsp_to_axi_interface to exclude
+      - user_i
+      -AxiUserWidth 
 */
 
 
@@ -448,12 +453,12 @@ module wl_top
     .AddrWidth ( AxiLiteAddrWidth ),
     .DataWidth ( AxiLiteDataWidth ),
     .AxiIdWidth ( 32'd1 ),
-    .AxiUserWidth ( 32'd1 ),
+    .AxiUserWidth ( 32'd1), 
     .ID ( 0 )
   ) i_bus_core_data_demux_ext_reqrsp_to_axi (
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
-    .user_i ( 1'b0 ),
+    .user_i ( 1'b0 ), 
     .reqrsp ( core_data_demux_ext ),
     .axi ( bus_core_data_demux_ext_axi_out )
   );

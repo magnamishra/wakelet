@@ -3,6 +3,13 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+// Magna Mishra   < Adapt test bench for pixel streaming >
+
+// Changes 
+// - Remove std::randomize for incoming data 
+// - Add temporary check for wakelet_done 
+// - Add wakelet_fone to snitch monitoring 
+// - Add tiemout 
 
 `include "axi/assign.svh"
 
@@ -18,7 +25,7 @@ module tb_wl_top
   localparam time TbTA = 2ns;
   localparam time TbTT = 8ns;
 
-  localparam int ActMemNumBytesInit = 2048;
+  localparam int ActMemNumBytesInit = 8192; // 2*4096
 
   //
   //  s_clk                             .--------.    .------------------- axi_lite_drv2xbar
@@ -43,6 +50,7 @@ module tb_wl_top
 
   logic s_clk;
   logic s_rst_n;
+  logic s_wakelet_done;
 
   clk_rst_gen #(
       .ClkPeriod ( ClkPeriod ),
@@ -292,7 +300,7 @@ module tb_wl_top
   // AXI master bus for sensor
   AXI_BUS #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
-    .AXI_DATA_WIDTH ( AxiWideDataWidth ),
+    .AXI_DATA_WIDTH ( AxiDataWidth ),
     .AXI_ID_WIDTH   ( AxiSlvIdWidth ),
     .AXI_USER_WIDTH ( AxiUserWidth )
   ) axi_wide_tb2dut ();
@@ -306,7 +314,7 @@ module tb_wl_top
   // AXI driver for sensor
   AXI_BUS_DV #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
-    .AXI_DATA_WIDTH ( AxiWideDataWidth ),
+    .AXI_DATA_WIDTH ( AxiDataWidth ),
     .AXI_ID_WIDTH   ( AxiSlvIdWidth ),
     .AXI_USER_WIDTH ( AxiUserWidth )
   ) axi_wide_tb2dut_dv (s_clk);
@@ -315,7 +323,7 @@ module tb_wl_top
 
   axi_test::axi_driver #(
     .AW ( AxiAddrWidth ),
-    .DW ( AxiWideDataWidth ),
+    .DW ( AxiDataWidth ),
     .IW ( AxiSlvIdWidth ),
     .UW ( AxiUserWidth ),
     .TA ( TbTA ),
@@ -323,7 +331,7 @@ module tb_wl_top
   ) axi_wide_driver = new(axi_wide_tb2dut_dv);
 
   typedef axi_test::axi_ax_beat #(.AW(AxiAddrWidth), .IW(AxiSlvIdWidth), .UW(AxiUserWidth)) aw_beat_t;
-  typedef axi_test::axi_w_beat #(.DW(AxiWideDataWidth), .UW(AxiUserWidth)) w_beat_t;
+  typedef axi_test::axi_w_beat #(.DW(AxiDataWidth), .UW(AxiUserWidth)) w_beat_t;
   typedef axi_test::axi_b_beat #(.IW(AxiSlvIdWidth), .UW(AxiUserWidth)) b_beat_t;
 
   /////////
@@ -343,8 +351,9 @@ module tb_wl_top
       .axi_lite_mst_rsp_i ( axi_lite_dut2tb_rsp ),
       .irq_i ( s_irq ),
       .eoc_o ( s_eoc ),
-      .axi_wide_slv_req_i ( axi_wide_tb2dut_req ),
-      .axi_wide_slv_rsp_o ( axi_wide_tb2dut_rsp )
+      .wakelet_done_o (s_wakelet_done), 
+      .axi_slv_req_i ( axi_wide_tb2dut_req ),
+      .axi_slv_rsp_o ( axi_wide_tb2dut_rsp )
     );
 
   //////////
@@ -460,23 +469,48 @@ module tb_wl_top
 
         aw_beat.ax_id    = '0;
         aw_beat.ax_addr  = '0; // start from address 0 of activation memory
-        aw_beat.ax_len   = ActMemNumBytesInit/(AxiWideDataWidth/8) - 1; // number of beats required - 1
-        aw_beat.ax_size  = $clog2(AxiWideDataWidth/8); // port width
+        aw_beat.ax_len   = ActMemNumBytesInit/(AxiDataWidth/8) - 1; // number of beats required - 1
+        aw_beat.ax_size  = $clog2(AxiDataWidth/8); // port width
         aw_beat.ax_burst = 2'b01; // INCR burst
         axi_wide_driver.send_aw(aw_beat);
+      
+        /// Replace old randomize block with exact data to test pixel difference 
 
-        for (int i = 0; i < ActMemNumBytesInit/(AxiWideDataWidth/8); i++) begin
+        // for (int i = 0; i < ActMemNumBytesInit/(AxiDataWidth/8); i++) begin
           // Generate random data for activation memory
-          rand_success = std::randomize(w_beat.w_data); assert(rand_success);
-          w_beat.w_strb = '1; // write all bytes
-          if (i == ActMemNumBytesInit/(AxiWideDataWidth/8) - 1) begin
-            w_beat.w_last = 1'b1; // last beat
+        //  rand_success = std::randomize(w_beat.w_data); assert(rand_success);
+        //  w_beat.w_strb = '1; // write all bytes
+        //  if (i == ActMemNumBytesInit/(AxiDataWidth/8) - 1) begin
+        //    w_beat.w_last = 1'b1; // last beat
+        //  end else begin
+        //    w_beat.w_last = 1'b0;
+        //  end
+        //  w_beat.w_user = '0;
+        //  axi_wide_driver.send_w(w_beat);
+        //end
+
+        for (int i = 0; i < ActMemNumBytesInit/(AxiDataWidth/8); i++) begin
+          // BUF_A (first half): all zeros
+          // BUF_B (second half): first 200 bytes = 0xFF, rest = 0x00
+          if (i < ActMemNumBytesInit/(2*(AxiDataWidth/8))) begin
+            // BUF_A = all zeros
+            w_beat.w_data = '0;
+          end else if (i == ActMemNumBytesInit/(2*(AxiDataWidth/8))) begin
+            // First word of BUF_B = all 0xFF (32 bytes = 32 pixels different)
+            w_beat.w_data = '1;
+          end else if (i <= ActMemNumBytesInit/(2*(AxiDataWidth/8)) + 5) begin
+            // Next 5 words of BUF_B = all 0xFF (5*32 = 160 more pixels, total 192)
+            w_beat.w_data = '1;
           end else begin
-            w_beat.w_last = 1'b0;
+            // Rest of BUF_B = zeros
+            w_beat.w_data = '0;
           end
-          w_beat.w_user = '0;
-          axi_wide_driver.send_w(w_beat);
+         w_beat.w_strb = '1;
+         w_beat.w_last = (i == ActMemNumBytesInit/(AxiDataWidth/8) - 1);
+         w_beat.w_user = '0;
+         axi_wide_driver.send_w(w_beat);
         end
+
         // Wait for the last beat to be acknowledged
         axi_wide_driver.recv_b(b_beat);
 
@@ -505,8 +539,25 @@ module tb_wl_top
     @(posedge s_clk);
     s_irq = #TbTA 1'b0;
 
-    /* Wait for EOC register */
+    // Add timeout sequence 
+    // Wait for wakelet_done_o or timeout
+    fork
+      begin : wait_wakelet
+        @(posedge s_wakelet_done);
+        $display("[TB] Wakelet signaled CROC at %t - motion detected!", $time);
+        $finish(0);
+      end
+      begin : timeout
+        // Timeout after 1ms (100,000 cycles at 10ns period)
+        repeat(100000) @(posedge s_clk);
+        $error("[TB] ERROR: Timeout waiting for wakelet_done_o!");
+        $finish(1);
+      end
+    join_any
+    disable fork;
 
+    /* Wait for EOC register */
+    /* Comment out for now 
     $timeformat(-9, 2, " ns", 0);
     while (1) begin
       @(posedge s_clk);
@@ -522,7 +573,7 @@ module tb_wl_top
         $finish(data);
       end
     end
+    */ 
 end
-
 
 endmodule

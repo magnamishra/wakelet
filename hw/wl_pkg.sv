@@ -90,7 +90,7 @@ package wl_pkg;
   typedef logic [AddrWidth-1:0] core_data_addr_t;
   typedef logic [DataWidth-1:0] core_data_data_t;
   typedef logic [DataWidth/8-1:0] core_data_strb_t;
-  // declare core_data_req_t, core_data_rsp_t, core_data_req_chan_t, core_data_rsp_chan_t
+  // declare core_data_req_t, core_data_rsp_t, core_data_req_chan_t, core_data_rsp_chan_t, logic is a placeholder
   `REQRSP_TYPEDEF_ALL(core_data, core_data_addr_t, core_data_data_t, core_data_strb_t)
  
   // Address demux rule type
