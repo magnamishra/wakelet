@@ -7,8 +7,8 @@ packages:
     dependencies:
     - common_cells
   axi:
-    revision: 78831b6feba265d5ee2683bbf42b4150f8a35c43
-    version: 0.39.8
+    revision: bec548fa2a9b18cbd7531105bb1fdf481ea8ad49
+    version: null
     source:
       Git: https://github.com/pulp-platform/axi.git
     dependencies:
@@ -32,8 +32,8 @@ packages:
     dependencies:
     - common_cells
   cluster_icache:
-    revision: 0e1fb6751d9684d968ba7fb40836e6118b448ecd
-    version: 0.1.1
+    revision: 64e21ae455bbdde850c4df13bef86ea55ac42537
+    version: 0.2.0
     source:
       Git: https://github.com/pulp-platform/cluster_icache.git
     dependencies:
@@ -97,17 +97,17 @@ packages:
     dependencies:
     - tech_cells_generic
   hwpe-datamover-example:
-    revision: bf8a5e13c2700d93039b6455bdcab689d4ced810
+    revision: a4904e5f830c66b098cbf49f277bc42083f8f5ed
     version: null
     source:
-      Git: https://github.com/sermazz/hwpe-datamover-example.git
+      Git: https://github.com/magnamishra/hwpe-datamover-example.git
     dependencies:
     - hci
     - hwpe-ctrl
     - hwpe-stream
   hwpe-stream:
-    revision: c1e25094bf9f2fee754611ef7491b7a1144e11b9
-    version: 1.9.1
+    revision: 35f6bb74b28acc5922262cf0244e7a7c7fe6a589
+    version: 1.9.2
     source:
       Git: https://github.com/pulp-platform/hwpe-stream.git
     dependencies:
@@ -116,7 +116,7 @@ packages:
     revision: 1a42da9d5c76f1cff0bcdaaacc474ed85631d734
     version: null
     source:
-      Git: https://github.com/pulp-platform/iDMA
+      Git: https://github.com/pulp-platform/iDMA.git
     dependencies:
     - axi
     - axi_stream
@@ -167,14 +167,14 @@ packages:
     - common_cells
     - tech_cells_generic
   scm:
-    revision: 472f99affe44ff7b282b519c047a3cfeb35b16c6
-    version: 1.2.0
+    revision: 1976c7efb4979271eee2abe262fde0f9a20e2557
+    version: 1.2.1
     source:
       Git: https://github.com/pulp-platform/scm.git
     dependencies:
     - tech_cells_generic
   snitch_cluster:
-    revision: 1e48b80ad50a62a100b9ee50513f80f43b349b58
+    revision: d602aad72e71a61aba10be4498d97387ff34361c
     version: null
     source:
       Git: https://github.com/pulp-platform/snitch_cluster.git
@@ -195,9 +195,3 @@ packages:
       Git: https://github.com/pulp-platform/tech_cells_generic.git
     dependencies:
     - common_verification
-  wakelet-pd:
-    revision: null
-    version: null
-    source:
-      Path: target/asic
-    dependencies: []

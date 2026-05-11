@@ -351,6 +351,7 @@ module tb_wl_top
       .axi_lite_mst_rsp_i ( axi_lite_dut2tb_rsp ),
       .irq_i ( s_irq ),
       .eoc_o ( s_eoc ),
+      .int_trig_o ( /* unconnected */), 
       .wakelet_done_o (s_wakelet_done), 
       .axi_slv_req_i ( axi_wide_tb2dut_req ),
       .axi_slv_rsp_o ( axi_wide_tb2dut_rsp )

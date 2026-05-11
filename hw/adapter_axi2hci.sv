@@ -3,6 +3,13 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
+// Magna Mishra < Override bypass parameters in axi cut >
+
+/* Changes 
+  - Remove bypass parameters in axi cut 
+  - Snitch cluster with mxip and Wakelet have clashing dependancies
+  - AXI version used in Snitch is not compatible with native AXI version on wakelet
+*/
 
 module adapter_axi2hci #(
   // AXI channels
@@ -32,11 +39,11 @@ module adapter_axi2hci #(
   // axi_to_mem requires AW and W channels to be valid at the same time
   // This is not compliant with AXI spec: we use axi_cut to patch this
   axi_cut #(
-    .BypassAw ( 1'b0 ),
-    .BypassW ( 1'b1 ),
-    .BypassB ( 1'b1 ),
-    .BypassAr ( 1'b1 ),
-    .BypassR ( 1'b1 ),
+    // .BypassAw ( 1'b0 ),
+    // .BypassW ( 1'b1 ),
+    // .BypassB ( 1'b1 ),
+    // .BypassAr ( 1'b1 ),
+    // .BypassR ( 1'b1 ),
     .aw_chan_t ( axi_aw_chan_t ),
     .w_chan_t ( axi_w_chan_t ),
     .b_chan_t ( axi_b_chan_t ),

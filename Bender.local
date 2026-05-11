@@ -1,5 +1,8 @@
 overrides:
-  axi: { git: "https://github.com/pulp-platform/axi.git", version: "=0.39.9" }
-  hci: { git: "https://github.com/pulp-platform/hci.git", version: "=2.3.0" }
-  register_interface: { git: "https://github.com/pulp-platform/register_interface.git", version: "=0.4.7" }
+  axi: { git: "https://github.com/pulp-platform/axi.git", rev: bec548fa2a9b18cbd7531105bb1fdf481ea8ad49 }
+  hci: { git: "https://github.com/pulp-platform/hci.git", rev: 8408a6d7a7a4d814dcb3468934e49b407b1c783e  }
+  register_interface: { git: "https://github.com/pulp-platform/register_interface.git", version: "=0.4.5" }
   snitch_cluster: { git: "https://github.com/pulp-platform/snitch_cluster.git", rev: d602aad  } # branch: main
+  idma: { git: "https://github.com/pulp-platform/iDMA.git", rev: 1a42da9d5c76f1cff0bcdaaacc474ed85631d734 }
+  common_cells: { git: "https://github.com/pulp-platform/common_cells.git", version: "= 1.38.0" }
+
