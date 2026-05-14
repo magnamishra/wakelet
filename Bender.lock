@@ -7,8 +7,8 @@ packages:
     dependencies:
     - common_cells
   axi:
-    revision: bec548fa2a9b18cbd7531105bb1fdf481ea8ad49
-    version: null
+    revision: 78831b6feba265d5ee2683bbf42b4150f8a35c43
+    version: 0.39.8
     source:
       Git: https://github.com/pulp-platform/axi.git
     dependencies:
@@ -32,8 +32,8 @@ packages:
     dependencies:
     - common_cells
   cluster_icache:
-    revision: 64e21ae455bbdde850c4df13bef86ea55ac42537
-    version: 0.2.0
+    revision: 0e1fb6751d9684d968ba7fb40836e6118b448ecd
+    version: 0.1.1
     source:
       Git: https://github.com/pulp-platform/cluster_icache.git
     dependencies:
@@ -174,7 +174,7 @@ packages:
     dependencies:
     - tech_cells_generic
   snitch_cluster:
-    revision: d602aad72e71a61aba10be4498d97387ff34361c
+    revision: 1e48b80ad50a62a100b9ee50513f80f43b349b58
     version: null
     source:
       Git: https://github.com/pulp-platform/snitch_cluster.git

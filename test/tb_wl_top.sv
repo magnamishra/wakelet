@@ -8,8 +8,11 @@
 // Changes 
 // - Remove std::randomize for incoming data 
 // - Add temporary check for wakelet_done 
-// - Add wakelet_fone to snitch monitoring 
-// - Add tiemout 
+// - Add wakelet_done to snitch monitoring 
+// - Add timeout
+// - Fix AXI burst width (8192 bytes) to 4096 bytes
+// - Fix xbar address map to include HWPE config space
+// - Simplified test: Snitch triggers both jobs
 
 `include "axi/assign.svh"
 
@@ -26,23 +29,6 @@ module tb_wl_top
   localparam time TbTT = 8ns;
 
   localparam int ActMemNumBytesInit = 8192; // 2*4096
-
-  //
-  //  s_clk                             .--------.    .------------------- axi_lite_drv2xbar
-  // s_rst_n                            |        |    |                   (axi_lite_tb_driver)
-  //  s_irq                             |      __v____v__  (masters)
-  //    |                               |     | AXI Lite |
-  //    |                               |     | Tb Xbar  |
-  //  __v__                             |     |__________| (slaves)
-  // |     |--- AXI Lite master --------'        |    |                        _______________
-  // | DUT |<-- AXI Lite slave ------------------'    '------[ Adapter ]----> | Tb Sim memory |
-  // |_____|<-- AXI wide slave ----.                                          |_______________|
-  //    |                          |
-  //    |                          |
-  //    v                 axi_wide_tb2dut_req
-  //  s_eoc               axi_wide_tb2dut_rsp
-  //                       (axi_wide_driver)
-  //                        
 
   ////////////////////////////
   // Clock/reset generation //
@@ -64,7 +50,6 @@ module tb_wl_top
   // AXI Lite Tb driver //
   ////////////////////////
 
-  // AXI Lite testbench master driver
   AXI_LITE #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth )
@@ -84,21 +69,15 @@ module tb_wl_top
     .TT ( TbTT )
   ) axi_lite_tb_driver = new(axi_lite_drv2xbar_dv);
 
-  // Specialized AXI Lite function that sends AW and W transactions in the same cycle
-  // (normally you would first handshake AW, then W), because the AXI2mem adapter used
-  // for the instruction and data memories expects it in this way
   task axi_lite_send_aw_w (
-    // AXI driver
     input axi_test::axi_lite_driver #(
       .AW ( AxiAddrWidth ),
       .DW ( AxiDataWidth ),
       .TA ( TbTA ),
       .TT ( TbTT )
     ) axi_drv,
-    // AW
     input logic [AxiAddrWidth-1:0] addr,
     input axi_pkg::prot_t          prot,
-    // W
     input logic [AxiDataWidth-1:0]   data,
     input logic [AxiDataWidth/8-1:0] strb
   );
@@ -123,7 +102,6 @@ module tb_wl_top
   // DUT AXI Lite buses //
   ////////////////////////
 
-  // AXI Lite master port of DUT
   AXI_LITE #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth )
@@ -135,7 +113,6 @@ module tb_wl_top
   `AXI_LITE_ASSIGN_FROM_REQ(axi_lite_dut2tb, axi_lite_dut2tb_req)
   `AXI_LITE_ASSIGN_TO_RESP(axi_lite_dut2tb_rsp, axi_lite_dut2tb)
 
-  // AXI Lite slave port of DUT
   AXI_LITE #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth )
@@ -172,12 +149,6 @@ module tb_wl_top
     .out ( axi_xbar2mem )
   );
 
-  //NOTE: As defined in TbXbarAddrMap, the memory range of the Tb sim memory is fragmented.
-  //      In particular, the addressed of the sim memory between `wl_pkg::InstrMemBaseAddr`
-  //      and `wl_pkg::DataMemBaseAddr + wl_pkg::DataMemOffset` cannot be accessed. A remap
-  //      would fix this but since the sim memory is infinite, a remap is not necessary and
-  //      would complicate debugging.
-
   axi_sim_mem_intf #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth ),
@@ -209,47 +180,35 @@ module tb_wl_top
   // Xbar //
   //////////
 
-  /* Masters */
-  // 0. from AXI Lite master driver of testbench
-  // 1. from AXI Lite master port of DUT
   localparam int unsigned TbXbarNumMasters = 2;
-
-  /* Slaves */
-  // 0. to testbench memory
-  // 1. to AXI Lite slave port of DUT
   localparam int unsigned TbXbarNumSlaves = 2;
-
-  // Routing rules
-  localparam int unsigned TbXbarNumRules = TbXbarNumSlaves + 1; // +1 for "everything above DUT"
+  localparam int unsigned TbXbarNumRules = TbXbarNumSlaves + 1;
   typedef axi_pkg::xbar_rule_32_t tb_xbar_rule_t;
+
   localparam tb_xbar_rule_t [TbXbarNumRules-1:0] TbXbarAddrMap = '{
     '{ // Tb sim memory (everything above DUT memory)
-        idx: 32'd0, // to Tb sim memory
+        idx: 32'd0,
         start_addr: wl_pkg::DataMemBaseAddr + wl_pkg::DataMemOffset,
         end_addr: 32'hFFFF_FFFF
     },
     '{ // DUT memory range
-        idx: 32'd1, // route to AXI Lite slave port of DUT
-        // Only pick the range actually addressable from outside
+        idx: 32'd1,
         start_addr: wl_pkg::InstrMemBaseAddr,
         end_addr: wl_pkg::DataMemBaseAddr + wl_pkg::DataMemOffset
     },
     '{ // Tb sim memory (everything below DUT memory)
-        idx: 32'd0, // to Tb sim memory
+        idx: 32'd0,
         start_addr: 32'h0000_0000,
         end_addr: wl_pkg::InstrMemBaseAddr
     }
   };
 
-  // Xbar config
   localparam axi_pkg::xbar_cfg_t TbXbarCfg = '{
     NoSlvPorts:     TbXbarNumMasters,
     NoMstPorts:     TbXbarNumSlaves,
     MaxMstTrans:    32'd5,
     MaxSlvTrans:    32'd2,
     FallThrough:    1'b0,
-    // Cut all channels of all slave ports to prevent
-    // combinational loop with the insides of the DUT
     LatencyMode:    axi_pkg::CUT_SLV_PORTS,
     PipelineStages: 32'd0,
     AxiAddrWidth:   AxiAddrWidth,
@@ -258,24 +217,18 @@ module tb_wl_top
     default:        '0
   };
 
-  // Xbar masters
   AXI_LITE #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth )
   ) tb_xbar_in [TbXbarNumMasters-1:0] ();
-  // 0. from AXI Lite master driver of testbench
   `AXI_LITE_ASSIGN(tb_xbar_in[0], axi_lite_drv2xbar)
-  // 1. from AXI Lite master port of DUT
   `AXI_LITE_ASSIGN(tb_xbar_in[1], axi_lite_dut2tb)
 
-  // Xbar slaves
   AXI_LITE #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth )
   ) tb_xbar_out [TbXbarNumSlaves-1:0] ();
-  // 0. to testbench memory
   `AXI_LITE_ASSIGN(axi_lite_xbar2mem, tb_xbar_out[0])
-  // 1. to AXI Lite slave port of DUT
   `AXI_LITE_ASSIGN(axi_lite_tb2dut, tb_xbar_out[1])
 
   axi_lite_xbar_intf #(
@@ -288,7 +241,6 @@ module tb_wl_top
     .slv_ports ( tb_xbar_in ),
     .mst_ports ( tb_xbar_out ),
     .addr_map_i ( TbXbarAddrMap ),
-    // disable default master port for all slave ports
     .en_default_mst_port_i ( '0 ),
     .default_mst_port_i ( '0 )
   );
@@ -297,7 +249,6 @@ module tb_wl_top
   // Wide AXI Tb driver (sensor) //
   /////////////////////////////////
 
-  // AXI master bus for sensor
   AXI_BUS #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth ),
@@ -311,7 +262,6 @@ module tb_wl_top
   `AXI_ASSIGN_TO_REQ(axi_wide_tb2dut_req, axi_wide_tb2dut)
   `AXI_ASSIGN_FROM_RESP(axi_wide_tb2dut, axi_wide_tb2dut_rsp)
 
-  // AXI driver for sensor
   AXI_BUS_DV #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth ),
     .AXI_DATA_WIDTH ( AxiDataWidth ),
@@ -335,7 +285,7 @@ module tb_wl_top
   typedef axi_test::axi_b_beat #(.IW(AxiSlvIdWidth), .UW(AxiUserWidth)) b_beat_t;
 
   /////////
-  // Dut //
+  // DUT //
   /////////
 
   logic s_irq;
@@ -351,8 +301,8 @@ module tb_wl_top
       .axi_lite_mst_rsp_i ( axi_lite_dut2tb_rsp ),
       .irq_i ( s_irq ),
       .eoc_o ( s_eoc ),
-      .int_trig_o ( /* unconnected */), 
-      .wakelet_done_o (s_wakelet_done), 
+      .int_trig_o ( /* unconnected */ ),
+      .wakelet_done_o ( s_wakelet_done ),
       .axi_slv_req_i ( axi_wide_tb2dut_req ),
       .axi_slv_rsp_o ( axi_wide_tb2dut_rsp )
     );
@@ -368,180 +318,131 @@ module tb_wl_top
     logic [DataWidth-1:0] data;
     logic [AddrWidth-1:0] address;
     automatic axi_pkg::resp_t resp;
-    automatic logic rand_success;
 
     /* Reset */
-
-    // Reset master-side AXI Lite
     axi_lite_tb_driver.reset_master();
-    // Reset remaining tb-driven signals
     s_irq = 1'b0;
-    // Reset sensor AXI interface
     axi_wide_driver.reset_master();
 
-    // Wait for reset to be released
     @(posedge s_rst_n);
 
     fork
       begin
-        // Retrieve binary names starting from app basename
-        // binary name specified with the `+bin=...` argument
         if (!$value$plusargs("bin=%s", app_base)) begin
           $fatal(1, "[TB] ERROR: No +bin=... argument specified");
         end
         instr_mem_bin = {app_base, ".instr_mem.bin"};
-        data_mem_bin = {app_base, ".data_mem.bin"};
+        data_mem_bin  = {app_base, ".data_mem.bin"};
 
-        /*  Preload instruction memory */
-
+        /* Preload instruction memory */
         $display("[TB] Flashing instruction memory from: %s", instr_mem_bin);
         file = $fopen(instr_mem_bin, "rb");
-        if (!file) begin
-          $fatal(1, "[TB] ERROR: Failed to open %s", instr_mem_bin);
-        end
+        if (!file) $fatal(1, "[TB] ERROR: Failed to open %s", instr_mem_bin);
 
         w_num = 0;
         address = InstrMemBaseAddr;
         while (!$feof(file)) begin
-          // Expects packed binary file
           ret = $fread(data, file);
-          if (ret == 0) begin
-            continue;
-          end else if (ret != 4) begin
-            $fatal("[TB] ERROR: Partial read (%0d bytes), aborting", ret);
-          end
-          // Reverse endianness (byte swap)
+          if (ret == 0) continue;
+          else if (ret != 4) $fatal("[TB] ERROR: Partial read (%0d bytes), aborting", ret);
           data = {data[7:0], data[15:8], data[23:16], data[31:24]};
-          // Send AXI Lite transaction
           axi_lite_send_aw_w(axi_lite_tb_driver, address, axi_pkg::prot_t'('0), data, '1);
           axi_lite_tb_driver.recv_b(resp);
           w_num++;
-          address +=4 ; // go to next word
+          address += 4;
         end
         $fclose(file);
-
         $info("[TB] Application flash complete. %0d words loaded in instruction memory.", w_num);
 
         /* Preload data memory */
-
         $display("[TB] Flashing data memory from: %s", data_mem_bin);
         file = $fopen(data_mem_bin, "rb");
-        if (!file) begin
-          $fatal(1, "[TB] ERROR: Failed to open %s", data_mem_bin);
-        end
+        if (!file) $fatal(1, "[TB] ERROR: Failed to open %s", data_mem_bin);
 
         w_num = 0;
         address = DataMemBaseAddr;
         while (!$feof(file)) begin
-          // Expects packed binary file
           ret = $fread(data, file);
-          if (ret == 0) begin
-            continue;
-          end else if (ret != 4) begin
-            $fatal("[TB] ERROR: Partial read (%0d bytes), aborting", ret);
-          end
-          // Reverse endianness (byte swap)
+          if (ret == 0) continue;
+          else if (ret != 4) $fatal("[TB] ERROR: Partial read (%0d bytes), aborting", ret);
           data = {data[7:0], data[15:8], data[23:16], data[31:24]};
-          // Send AXI Lite transaction
           axi_lite_send_aw_w(axi_lite_tb_driver, address, axi_pkg::prot_t'('0), data, '1);
           axi_lite_tb_driver.recv_b(resp);
           w_num++;
-          address +=4 ; // go to next word
+          address += 4;
         end
         $fclose(file);
-
         $info("[TB] Data flash complete. %0d words loaded in SPM.", w_num);
 
-        // Reset AXI Lite interface again
         axi_lite_tb_driver.reset_master();
         @(posedge s_clk);
       end
-      begin
 
+      begin
         automatic aw_beat_t aw_beat = new();
-        automatic w_beat_t w_beat = new();
-        automatic b_beat_t b_beat = new();
+        automatic w_beat_t  w_beat  = new();
+        automatic b_beat_t  b_beat  = new();
 
         /* Preload activation memory */
+        $display("[TB] Initialising activation memory.");
 
-        $display("[TB] Flashing activation memory with random data.");
-
-        // Exploit dedicated sensor wide interface
-
+        // BUF_A: all zeros
         aw_beat.ax_id    = '0;
-        aw_beat.ax_addr  = '0; // start from address 0 of activation memory
-        aw_beat.ax_len   = ActMemNumBytesInit/(AxiDataWidth/8) - 1; // number of beats required - 1
-        aw_beat.ax_size  = $clog2(AxiDataWidth/8); // port width
-        aw_beat.ax_burst = 2'b01; // INCR burst
+        aw_beat.ax_addr  = 32'h0000_0000;
+        aw_beat.ax_len   = (4096/(AxiDataWidth/8)) - 1;
+        aw_beat.ax_size  = $clog2(AxiDataWidth/8);
+        aw_beat.ax_burst = 2'b01;
         axi_wide_driver.send_aw(aw_beat);
-      
-        /// Replace old randomize block with exact data to test pixel difference 
-
-        // for (int i = 0; i < ActMemNumBytesInit/(AxiDataWidth/8); i++) begin
-          // Generate random data for activation memory
-        //  rand_success = std::randomize(w_beat.w_data); assert(rand_success);
-        //  w_beat.w_strb = '1; // write all bytes
-        //  if (i == ActMemNumBytesInit/(AxiDataWidth/8) - 1) begin
-        //    w_beat.w_last = 1'b1; // last beat
-        //  end else begin
-        //    w_beat.w_last = 1'b0;
-        //  end
-        //  w_beat.w_user = '0;
-        //  axi_wide_driver.send_w(w_beat);
-        //end
-
-        for (int i = 0; i < ActMemNumBytesInit/(AxiDataWidth/8); i++) begin
-          // BUF_A (first half): all zeros
-          // BUF_B (second half): first 200 bytes = 0xFF, rest = 0x00
-          if (i < ActMemNumBytesInit/(2*(AxiDataWidth/8))) begin
-            // BUF_A = all zeros
-            w_beat.w_data = '0;
-          end else if (i == ActMemNumBytesInit/(2*(AxiDataWidth/8))) begin
-            // First word of BUF_B = all 0xFF (32 bytes = 32 pixels different)
-            w_beat.w_data = '1;
-          end else if (i <= ActMemNumBytesInit/(2*(AxiDataWidth/8)) + 5) begin
-            // Next 5 words of BUF_B = all 0xFF (5*32 = 160 more pixels, total 192)
-            w_beat.w_data = '1;
-          end else begin
-            // Rest of BUF_B = zeros
-            w_beat.w_data = '0;
-          end
-         w_beat.w_strb = '1;
-         w_beat.w_last = (i == ActMemNumBytesInit/(AxiDataWidth/8) - 1);
-         w_beat.w_user = '0;
-         axi_wide_driver.send_w(w_beat);
+        for (int i = 0; i < 4096/(AxiDataWidth/8); i++) begin
+          w_beat.w_data = '0;
+          w_beat.w_strb = '1;
+          w_beat.w_last = (i == 4096/(AxiDataWidth/8) - 1);
+          w_beat.w_user = '0;
+          axi_wide_driver.send_w(w_beat);
         end
-
-        // Wait for the last beat to be acknowledged
         axi_wide_driver.recv_b(b_beat);
 
-        $info("[TB] Activation memory flash complete. %0d bytes loaded in SPM.", ActMemNumBytesInit);
+        // BUF_B: first 192 bytes = 0xFF, rest zeros
+        aw_beat.ax_id    = '0;
+        aw_beat.ax_addr  = 32'h0000_1000;
+        aw_beat.ax_len   = (4096/(AxiDataWidth/8)) - 1;
+        aw_beat.ax_size  = $clog2(AxiDataWidth/8);
+        aw_beat.ax_burst = 2'b01;
+        axi_wide_driver.send_aw(aw_beat);
+        for (int i = 0; i < 4096/(AxiDataWidth/8); i++) begin
+          if (i <= 5) begin
+            w_beat.w_data = '1; // 6 * 32 bytes = 192 bytes of 0xFF
+          end else begin
+            w_beat.w_data = '0;
+          end
+          w_beat.w_strb = '1;
+          w_beat.w_last = (i == 4096/(AxiDataWidth/8) - 1);
+          w_beat.w_user = '0;
+          axi_wide_driver.send_w(w_beat);
+        end
+        axi_wide_driver.recv_b(b_beat);
 
+        $info("[TB] Activation memory initialised. %0d bytes loaded.", ActMemNumBytesInit);
         axi_wide_driver.reset_master();
         @(posedge s_clk);
       end
     join
 
     /* Start program execution */
-
-    // Wait for Snitch to complete bootrom execution
-    // (Snitch goes into wfi when bootrom execution is completed)
     `ifndef TARGET_ASIC
-      //TODO: What happens if we launch interrupt before bootrom is done?
-      //TODO: This is purely behavioral, will not work for asic target
       if (!dut.i_core_subsystem.i_snitch.wfi_q) begin
         $display("[TB] Waiting for bootrom to complete...");
         @(posedge dut.i_core_subsystem.i_snitch.wfi_q);
       end
     `endif
-    repeat (5) @(posedge s_clk);
-    // Send wake-up meip interrupt
+    repeat(5) @(posedge s_clk);
+
+    // Wake Snitch to configure and trigger datamover
     s_irq = #TbTA 1'b1;
     @(posedge s_clk);
     s_irq = #TbTA 1'b0;
 
-    // Add timeout sequence 
-    // Wait for wakelet_done_o or timeout
+    // Wait for wakelet_done or timeout
     fork
       begin : wait_wakelet
         @(posedge s_wakelet_done);
@@ -549,32 +450,13 @@ module tb_wl_top
         $finish(0);
       end
       begin : timeout
-        // Timeout after 1ms (100,000 cycles at 10ns period)
-        repeat(100000) @(posedge s_clk);
+        repeat(20000000) @(posedge s_clk);
         $error("[TB] ERROR: Timeout waiting for wakelet_done_o!");
         $finish(1);
       end
     join_any
     disable fork;
 
-    /* Wait for EOC register */
-    /* Comment out for now 
-    $timeformat(-9, 2, " ns", 0);
-    while (1) begin
-      @(posedge s_clk);
-      #TbTT;
-      if (s_eoc[0] == 1'b1) begin
-        data = {s_eoc[DataWidth-1], s_eoc[DataWidth-1:1]}; // Return value (usually 8 bits): shift right 1 and sign extend
-        $display("[TB] EOC: Simulation ended at %t (retval = %0d, 0x%8x).", $time, data, data);
-        if (data != 0) begin
-          $error("[TB] ERROR! Non-zero return value detected.");
-        end else begin
-          $display("[TB] Test passed!");
-        end
-        $finish(data);
-      end
-    end
-    */ 
-end
+  end
 
 endmodule

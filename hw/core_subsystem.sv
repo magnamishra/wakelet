@@ -5,6 +5,12 @@
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
 // Magna Mishra < bring mxip interrupt from Snitch to Wakelet top level > 
 
+/*
+  Changes
+    - Updated snitch cluster which drives mxip breaks bender dependencies
+    -Instead use mcip to fire the interrupt 
+*/
+
 module core_subsystem #(
   parameter int unsigned AddrWidth = 32,
   parameter int unsigned DataWidth = 32,
@@ -15,7 +21,7 @@ module core_subsystem #(
   input  logic                 clk_i,
   input  logic                 rst_ni,
   input  logic                 irq_meip_i,
-  input  logic                 irq_mxip_i, 
+  input  logic                 irq_mcip_i, 
   output logic [AddrWidth-1:0] inst_addr_o,
   input  logic [31:0]          inst_data_i,
   output logic                 inst_valid_o,
@@ -45,7 +51,7 @@ module core_subsystem #(
   always_comb begin : core_irq_binding
     core_irq = '0;
     core_irq.meip = irq_meip_i;
-    core_irq.mxip = irq_mxip_i; 
+    core_irq.mcip = irq_mcip_i; 
   end
 
   // Snitch core (minimal instance)

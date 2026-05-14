@@ -362,7 +362,7 @@ module wl_top
     .clk_i ( clk_i ),
     .rst_ni ( rst_ni ),
     .irq_meip_i  ( irq_i ),
-    .irq_mxip_i  ( pixel_wakeup ), 
+    .irq_mcip_i  ( pixel_wakeup ), 
     .inst_addr_o ( core_instr_addr ),
     .inst_data_i ( core_instr_data ),
     .inst_valid_o ( core_instr_valid ),

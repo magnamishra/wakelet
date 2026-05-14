@@ -4,7 +4,7 @@
 //
 // Francesco Conti <f.conti@unibo.it>
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
-// Magna Mishra   < Update generic parameters for runtime config >
+// Magna Mishra   < Update generic parameters for runtime >
 
 #include <stdio.h>
 
