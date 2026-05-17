@@ -13,9 +13,12 @@
 // - Fix AXI burst width (8192 bytes) to 4096 bytes
 // - Fix xbar address map to include HWPE config space
 // - Simplified test: Snitch triggers both jobs
+// - Updated test bench to include continuous streaming
+// - Fix sensor loop: use join_none to avoid fork driver conflict
+// - Fix sensor loop: send AW and W simultaneously to avoid deadlock
+// - Change onject assignment between BUF_A and B, test for reduced frames
 
 `include "axi/assign.svh"
-
 module tb_wl_top
   import wl_pkg::*;
 #()();
@@ -28,7 +31,7 @@ module tb_wl_top
   localparam time TbTA = 2ns;
   localparam time TbTT = 8ns;
 
-  localparam int ActMemNumBytesInit = 8192; // 2*4096
+  localparam int ActMemNumBytesInit = 8192; // 2 buffers * 4096 bytes
 
   ////////////////////////////
   // Clock/reset generation //
@@ -120,7 +123,7 @@ module tb_wl_top
 
   axi_lite_req_t axi_lite_tb2dut_req;
   axi_lite_resp_t axi_lite_tb2dut_rsp;
-  
+
   `AXI_LITE_ASSIGN_TO_REQ(axi_lite_tb2dut_req, axi_lite_tb2dut)
   `AXI_LITE_ASSIGN_FROM_RESP(axi_lite_tb2dut, axi_lite_tb2dut_rsp)
 
@@ -284,6 +287,40 @@ module tb_wl_top
   typedef axi_test::axi_w_beat #(.DW(AxiDataWidth), .UW(AxiUserWidth)) w_beat_t;
   typedef axi_test::axi_b_beat #(.IW(AxiSlvIdWidth), .UW(AxiUserWidth)) b_beat_t;
 
+  // -------------------------------------------------------------------
+  // Task: send one AXI burst to initialise a buffer.
+  // A fresh beat object is allocated on every call so the driver never
+  // aliases between transactions (fixes BUF_B always-zero bug).
+  // -------------------------------------------------------------------
+  task automatic send_axi_buffer (
+    input logic [AxiAddrWidth-1:0]  base_addr,
+    input logic [AxiDataWidth-1:0]  fill_data [],
+    input int unsigned               num_bytes
+  );
+    automatic aw_beat_t aw = new();
+    automatic w_beat_t  w  = new();
+    automatic b_beat_t  b  = new();
+    automatic int unsigned num_beats = num_bytes / (AxiDataWidth/8);
+
+    aw.ax_id    = '0;
+    aw.ax_addr  = base_addr;
+    aw.ax_len   = num_beats - 1;
+    aw.ax_size  = $clog2(AxiDataWidth/8);
+    aw.ax_burst = 2'b01;
+    axi_wide_driver.send_aw(aw);
+
+    for (int i = 0; i < num_beats; i++) begin
+      w.w_data = fill_data[i];
+      w.w_strb = '1;
+      w.w_last = (i == num_beats - 1);
+      w.w_user = '0;
+      axi_wide_driver.send_w(w);
+    end
+
+    axi_wide_driver.recv_b(b);
+    @(posedge s_clk); // drain before next transaction
+  endtask
+
   /////////
   // DUT //
   /////////
@@ -307,6 +344,37 @@ module tb_wl_top
       .axi_slv_rsp_o ( axi_wide_tb2dut_rsp )
     );
 
+
+  // Monitor activation memory writes
+  generate
+  for (genvar b = 0; b < 16; b++) begin : gen_mem_monitor
+    always @(posedge s_clk) begin
+      if (dut.i_hwpe_subsystem.hci_mem[b].req && 
+          !dut.i_hwpe_subsystem.hci_mem[b].wen) begin
+        $display("[MEM] t=%0t bank=%0d addr=0x%03x data=0x%08x be=0x%01x",
+                 $time, b,
+                 dut.i_hwpe_subsystem.hci_mem[b].add,
+                 dut.i_hwpe_subsystem.hci_mem[b].data,
+                 dut.i_hwpe_subsystem.hci_mem[b].be);
+      end
+    end
+  end
+  endgenerate
+
+  // Monitor activation memory reads
+  generate
+  for (genvar b = 0; b < 16; b++) begin : gen_mem_read_monitor
+    always @(posedge s_clk) begin
+      if (dut.i_hwpe_subsystem.hci_mem[b].req && 
+          dut.i_hwpe_subsystem.hci_mem[b].wen) begin
+        $display("[MEM READ] t=%0t bank=%0d addr=0x%03x r_data=0x%08x",
+                 $time, b,
+                 dut.i_hwpe_subsystem.hci_mem[b].add,
+                 dut.i_hwpe_subsystem.hci_mem[b].r_data);
+      end
+    end
+  end
+  endgenerate
   //////////
   // Test //
   //////////
@@ -327,6 +395,9 @@ module tb_wl_top
     @(posedge s_rst_n);
 
     fork
+      // ------------------------------------------------------------------
+      // Thread 1: flash instruction + data memories over AXI Lite
+      // ------------------------------------------------------------------
       begin
         if (!$value$plusargs("bin=%s", app_base)) begin
           $fatal(1, "[TB] ERROR: No +bin=... argument specified");
@@ -378,49 +449,33 @@ module tb_wl_top
         @(posedge s_clk);
       end
 
+      // ------------------------------------------------------------------
+      // Thread 2: initialise activation memory (double-buffered BUF_A/B)
+      //
+      // Only 2 physical buffers exist; frames alternate between them:
+      //   Frame 0 -> BUF_A (0x0000_0000)
+      //   Frame 1 -> BUF_B (0x0000_1000)
+      //   Frame 2 -> BUF_A (reused)
+      //   Frame 3 -> BUF_B (reused)  ...
+      //
+      // Fresh beat objects are allocated inside send_axi_buffer() on every
+      // call, preventing the driver from aliasing between transactions.
+      // ------------------------------------------------------------------
       begin
-        automatic aw_beat_t aw_beat = new();
-        automatic w_beat_t  w_beat  = new();
-        automatic b_beat_t  b_beat  = new();
+        automatic logic [AxiDataWidth-1:0] zeros     [];
+        automatic logic [AxiDataWidth-1:0] buf_b_data[];
+        automatic int unsigned beats = 4096 / (AxiDataWidth/8);
 
-        /* Preload activation memory */
-        $display("[TB] Initialising activation memory.");
+        zeros      = new[beats];
+        buf_b_data = new[beats];
 
-        // BUF_A: all zeros
-        aw_beat.ax_id    = '0;
-        aw_beat.ax_addr  = 32'h0000_0000;
-        aw_beat.ax_len   = (4096/(AxiDataWidth/8)) - 1;
-        aw_beat.ax_size  = $clog2(AxiDataWidth/8);
-        aw_beat.ax_burst = 2'b01;
-        axi_wide_driver.send_aw(aw_beat);
-        for (int i = 0; i < 4096/(AxiDataWidth/8); i++) begin
-          w_beat.w_data = '0;
-          w_beat.w_strb = '1;
-          w_beat.w_last = (i == 4096/(AxiDataWidth/8) - 1);
-          w_beat.w_user = '0;
-          axi_wide_driver.send_w(w_beat);
-        end
-        axi_wide_driver.recv_b(b_beat);
+        foreach (zeros[i])      zeros[i]      = '0;
+        foreach (buf_b_data[i]) buf_b_data[i] = (i <= 5) ? '1 : '0; // beats 0-5: 0xFF (192 B), rest: 0x00
 
-        // BUF_B: first 192 bytes = 0xFF, rest zeros
-        aw_beat.ax_id    = '0;
-        aw_beat.ax_addr  = 32'h0000_1000;
-        aw_beat.ax_len   = (4096/(AxiDataWidth/8)) - 1;
-        aw_beat.ax_size  = $clog2(AxiDataWidth/8);
-        aw_beat.ax_burst = 2'b01;
-        axi_wide_driver.send_aw(aw_beat);
-        for (int i = 0; i < 4096/(AxiDataWidth/8); i++) begin
-          if (i <= 5) begin
-            w_beat.w_data = '1; // 6 * 32 bytes = 192 bytes of 0xFF
-          end else begin
-            w_beat.w_data = '0;
-          end
-          w_beat.w_strb = '1;
-          w_beat.w_last = (i == 4096/(AxiDataWidth/8) - 1);
-          w_beat.w_user = '0;
-          axi_wide_driver.send_w(w_beat);
-        end
-        axi_wide_driver.recv_b(b_beat);
+        $display("[TB] Initialising activation memory (double buffering, 2 physical buffers).");
+
+        send_axi_buffer(32'h0000_0000, zeros,      4096);  // BUF_A: all zeros
+        send_axi_buffer(32'h0000_1000, buf_b_data, 4096);  // BUF_B: 192B of 0xFF, rest zeros
 
         $info("[TB] Activation memory initialised. %0d bytes loaded.", ActMemNumBytesInit);
         axi_wide_driver.reset_master();
@@ -442,7 +497,11 @@ module tb_wl_top
     @(posedge s_clk);
     s_irq = #TbTA 1'b0;
 
-    // Wait for wakelet_done or timeout
+    // Give Snitch time to configure datamover and reach wfi
+    repeat(50000) @(posedge s_clk);
+    $display("[TB] Starting sensor loop at %t", $time);
+
+    // Wait for wakelet or timeout
     fork
       begin : wait_wakelet
         @(posedge s_wakelet_done);
@@ -450,7 +509,7 @@ module tb_wl_top
         $finish(0);
       end
       begin : timeout
-        repeat(20000000) @(posedge s_clk);
+        repeat(1500000) @(posedge s_clk);
         $error("[TB] ERROR: Timeout waiting for wakelet_done_o!");
         $finish(1);
       end
