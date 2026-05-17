@@ -475,7 +475,7 @@ module tb_wl_top
         $display("[TB] Initialising activation memory (double buffering, 2 physical buffers).");
 
         send_axi_buffer(32'h0000_0000, zeros,      4096);  // BUF_A: all zeros
-        send_axi_buffer(32'h0000_1000, buf_b_data, 4096);  // BUF_B: 192B of 0xFF, rest zeros
+        send_axi_buffer(32'h0000_1000, zeros,      4096);  // BUF_B: 192B of 0xFF, rest zeros
 
         $info("[TB] Activation memory initialised. %0d bytes loaded.", ActMemNumBytesInit);
         axi_wide_driver.reset_master();
@@ -496,26 +496,52 @@ module tb_wl_top
     s_irq = #TbTA 1'b1;
     @(posedge s_clk);
     s_irq = #TbTA 1'b0;
+  
+  // Give Snitch time to configure datamover and reach wfi
+  repeat(50000) @(posedge s_clk);
+  $display("[TB] Starting sensor loop at %t", $time);
+  // Start sensor loop as background process
+  fork : sensor_process
+    begin
+      automatic int unsigned frame_num = 0;
+      automatic logic [AxiDataWidth-1:0] frame_data[];
+      automatic int unsigned beats = 4096 / (AxiDataWidth/8);
 
-    // Give Snitch time to configure datamover and reach wfi
-    repeat(50000) @(posedge s_clk);
-    $display("[TB] Starting sensor loop at %t", $time);
+      frame_data = new[beats];
 
-    // Wait for wakelet or timeout
-    fork
-      begin : wait_wakelet
-        @(posedge s_wakelet_done);
-        $display("[TB] Wakelet signaled CROC at %t - motion detected!", $time);
-        $finish(0);
+      // Wait for FILL job to complete (~1280 cycles)
+      repeat(5000) @(posedge s_clk);
+
+      forever begin
+        frame_num++;
+
+        // Build frame data
+        foreach (frame_data[i]) begin
+          // Frames 1-5: zeros, Frame 6+: motion
+          frame_data[i] = (frame_num >= 6 && i <= 5) ? '1 : '0;
+        end
+
+        send_axi_buffer(32'h0000_1000, frame_data, 4096);
+        $display("[TB] Sensor: Frame %0d written to BUF_B at %t", frame_num, $time);
+
+        // Wait one frame period
+        repeat(333333) @(posedge s_clk);
       end
-      begin : timeout
-        repeat(1500000) @(posedge s_clk);
-        $error("[TB] ERROR: Timeout waiting for wakelet_done_o!");
-        $finish(1);
-      end
-    join_any
-    disable fork;
-
+    end
+  join_none
+  // Wait for wakelet or timeout
+  fork
+    begin : wait_wakelet
+      @(posedge s_wakelet_done);
+      $display("[TB] Wakelet signaled CROC at %t - motion detected!", $time);
+      $finish(0);
+    end
+    begin : timeout
+      repeat(5000000) @(posedge s_clk);
+      $error("[TB] ERROR: Timeout!");
+      $finish(1);
+    end
+  join_any
+  disable fork;
   end
-
 endmodule
