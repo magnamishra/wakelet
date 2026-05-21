@@ -63,23 +63,43 @@ module core_data_mem #(
 
   `elsif TARGET_WL_DATA_SRAM
     // Generate SRAM cut
-    tc_sram #(
-      .NumWords ( 2 ** IdxWidth ),
-      .DataWidth ( DataWidth ),
-      .ByteWidth ( 32'd8 ),
-      .NumPorts ( 32'd1 ),
-      .Latency ( 32'd1 )
-    ) i_sram (
-      .clk_i ( clk_i ),
-      .rst_ni ( rst_ni ),
-      .req_i ( r_en | w_en ),
-      .we_i ( w_en ),
-      .addr_i ( rw_idx ),
-      .wdata_i ( w_data ),
-      .be_i ( w_be ),
-      .rdata_o ( r_data )
-    );
-
+      `ifdef TARGET_SYNTHESIS
+        tc_sram_impl #(
+          .NumWords  ( 2 ** IdxWidth ),
+          .DataWidth ( DataWidth     ),
+          .ByteWidth ( 32'd8         ),
+          .NumPorts  ( 32'd1         ),
+          .Latency   ( 32'd1         )
+        ) i_sram (
+          .clk_i   ( clk_i       ),
+          .rst_ni  ( rst_ni      ),
+          .impl_i  ( '0          ),
+          .impl_o  (             ),
+          .req_i   ( r_en | w_en ),
+          .we_i    ( w_en        ),
+          .addr_i  ( rw_idx      ),
+          .wdata_i ( w_data      ),
+          .be_i    ( w_be        ),
+          .rdata_o ( r_data      )
+        );
+      `else
+        tc_sram #(
+          .NumWords ( 2 ** IdxWidth ),
+          .DataWidth ( DataWidth ),
+          .ByteWidth ( 32'd8 ),
+          .NumPorts ( 32'd1 ),
+          .Latency ( 32'd1 )
+        ) i_sram (
+          .clk_i ( clk_i ),
+          .rst_ni ( rst_ni ),
+          .req_i ( r_en | w_en ),
+          .we_i ( w_en ),
+          .addr_i ( rw_idx ),
+          .wdata_i ( w_data ),
+          .be_i ( w_be ),
+          .rdata_o ( r_data )
+          );
+      `endif
   `else
     $fatal(1, "[core_data_mem] ERROR: No target memory type defined.");
   `endif

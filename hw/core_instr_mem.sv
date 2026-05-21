@@ -8,7 +8,10 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Sergio Mazzola <smazzola@iis.ee.ethz.ch>
-// Additional changes: TARGET_WL_INSTR_SCM updated as memory target 
+/* Changes: 
+    -TARGET_WL_INSTR_SCM updated as memory targets
+*/
+
 
 `include "common_cells/registers.svh"
 
@@ -87,25 +90,46 @@ module core_instr_mem #(
   `elsif TARGET_WL_INSTR_SRAM
     logic w_en_filter;
     assign w_en_filter = w_en_i & ~mem_r_en & ~r_en_i; // no read in progress or requested
-
+    
+    `ifdef TARGET_SYNTHESIS
     // Generate SRAM cut
-    tc_sram #(
-      .NumWords ( 2 ** IdxWidth ),
-      .DataWidth ( DataWidth ),
-      .ByteWidth ( 32'd8 ),
-      .NumPorts ( 32'd1 ),
-      .Latency ( 32'd1 )
-    ) i_sram (
-      .clk_i ( clk_i ),
-      .rst_ni ( rst_ni ),
-      .req_i ( mem_r_en | w_en_filter ),
-      .we_i ( w_en_filter ),
-      .addr_i ( mem_r_en ? mem_r_idx : w_idx ),
-      .wdata_i ( w_data_i ),
-      .be_i ( '1 ),
-      .rdata_o ( mem_r_data )
-    );
+      tc_sram_impl #(
+        .NumWords ( 2 ** IdxWidth ),
+        .DataWidth ( DataWidth ),
+        .ByteWidth ( 32'd8 ),
+        .NumPorts ( 32'd1 ),
+        .Latency ( 32'd1 )
+      ) i_sram (
+        .clk_i ( clk_i ),
+        .rst_ni ( rst_ni ),
+        .impl_i (  '0     ),
+        .impl_o (         ),
+        .req_i ( mem_r_en | w_en_filter ),
+        .we_i ( w_en_filter ),
+        .addr_i ( mem_r_en ? mem_r_idx : w_idx ),
+        .wdata_i ( w_data_i ),
+        .be_i ( '1 ),
+        .rdata_o ( mem_r_data )
+      );
 
+    `else
+      tc_sram #(
+        .NumWords ( 2 ** IdxWidth ),
+        .DataWidth ( DataWidth ),
+        .ByteWidth ( 32'd8 ),
+        .NumPorts ( 32'd1 ),
+        .Latency ( 32'd1 )
+      ) i_sram (
+        .clk_i ( clk_i ),
+        .rst_ni ( rst_ni ),
+        .req_i ( mem_r_en | w_en_filter ),
+        .we_i ( w_en_filter ),
+        .addr_i ( mem_r_en ? mem_r_idx : w_idx ),
+        .wdata_i ( w_data_i ),
+        .be_i ( '1 ),
+        .rdata_o ( mem_r_data )
+      );
+    `endif
     // Write is effective as per the cycle after the request
     `FFARN(w_ack_o, w_en_filter, 1'b0, clk_i, rst_ni)
 
