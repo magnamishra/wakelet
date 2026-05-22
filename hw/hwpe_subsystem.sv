@@ -6,6 +6,10 @@
 // Arpan Suravi Prasad <prasadar@iis.ee.ethz.ch>
 // Magna Mishra < integrate data mover modifications > 
 
+/* Changes 
+    -Add synthesis guard for memory bank. 
+*/
+
 `include "hci_helpers.svh"
 
 module hwpe_subsystem 
@@ -289,65 +293,71 @@ module hwpe_subsystem
 
     //NOTE: For the HCI protocol, write enable is active-low
 
-    `ifdef TARGET_WL_ACT_SCM
-      // Generate standard-cell-based memory
-      register_file_1r_1w_be #(
-        .ADDR_WIDTH ( BankAddrWidth ),
-        .DATA_WIDTH ( ExtDataWidth ),
-        .NUM_BYTE   ( ExtNumElemWord )
-      ) i_scm (
-        .clk ( clk_i ),
-        .ReadEnable ( hci_mem[i].req & hci_mem[i].wen ),
-        .ReadAddr ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
-        .ReadData ( hci_mem[i].r_data ),
-        .WriteEnable ( hci_mem[i].req & ~hci_mem[i].wen ),
-        .WriteAddr ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
-        .WriteData ( hci_mem[i].data ),
-        .WriteBE ( hci_mem[i].be )
-      );
-
-    `elsif TARGET_WL_ACT_SRAM
-      // Generate SRAM cut
-      `ifdef TARGET_SYNTHESIS
-        tc_sram_impl #(
-          .NumWords ( ActMemNumBankWords ),
-          .DataWidth ( ExtDataWidth ),
-          .ByteWidth ( 32'd8 ),
-          .NumPorts ( 32'd1 ),
-          .Latency ( 32'd1 )
-        ) i_sram (
-          .clk_i ( clk_i ),
-          .rst_ni ( rst_ni ),
-          .impl_i (   '0   ),
-          .impl_o (        ), 
-          .req_i ( hci_mem[i].req ),
-          .we_i ( ~hci_mem[i].wen ),
-          .addr_i ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
-          .wdata_i ( hci_mem[i].data ),
-          .be_i ( hci_mem[i].be ),
-          .rdata_o ( hci_mem[i].r_data )
+    // Additional guard bank for synthesis - skip activation memory banks for Wakelet 
+    `ifdef NO_ACT_MEM
+      // Blackbox stub - no memory instantiated
+      assign hci_mem[i].r_data = '0;
+    `else
+      `ifdef TARGET_WL_ACT_SCM
+        // Generate standard-cell-based memory
+        register_file_1r_1w_be #(
+          .ADDR_WIDTH ( BankAddrWidth ),
+          .DATA_WIDTH ( ExtDataWidth ),
+          .NUM_BYTE   ( ExtNumElemWord )
+        ) i_scm (
+          .clk ( clk_i ),
+          .ReadEnable ( hci_mem[i].req & hci_mem[i].wen ),
+          .ReadAddr ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
+          .ReadData ( hci_mem[i].r_data ),
+          .WriteEnable ( hci_mem[i].req & ~hci_mem[i].wen ),
+          .WriteAddr ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
+          .WriteData ( hci_mem[i].data ),
+          .WriteBE ( hci_mem[i].be )
         );
+
+      `elsif TARGET_WL_ACT_SRAM
+        // Generate SRAM cut
+        `ifdef TARGET_SYNTHESIS
+          tc_sram_impl #(
+            .NumWords ( ActMemNumBankWords ),
+            .DataWidth ( ExtDataWidth ),
+            .ByteWidth ( 32'd8 ),
+            .NumPorts ( 32'd1 ),
+            .Latency ( 32'd1 )
+          ) i_sram (
+            .clk_i ( clk_i ),
+            .rst_ni ( rst_ni ),
+            .impl_i (   '0   ),
+            .impl_o (        ), 
+            .req_i ( hci_mem[i].req ),
+            .we_i ( ~hci_mem[i].wen ),
+            .addr_i ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
+            .wdata_i ( hci_mem[i].data ),
+            .be_i ( hci_mem[i].be ),
+            .rdata_o ( hci_mem[i].r_data )
+          );
+       `else
+         tc_sram #(
+          .NumWords  ( ActMemNumBankWords ),
+          .DataWidth ( ExtDataWidth       ),
+          .ByteWidth ( 32'd8              ),
+          .NumPorts  ( 32'd1              ),
+          .Latency   ( 32'd1              )
+        ) i_sram (
+          .clk_i   ( clk_i                              ),
+          .rst_ni  ( rst_ni                             ),
+          .req_i   ( hci_mem[i].req                     ),
+          .we_i    ( ~hci_mem[i].wen                    ),
+          .addr_i  ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
+          .wdata_i ( hci_mem[i].data                    ),
+          .be_i    ( hci_mem[i].be                      ),
+          .rdata_o ( hci_mem[i].r_data                  )
+        );
+       `endif
      `else
-      tc_sram #(
-        .NumWords  ( ActMemNumBankWords ),
-        .DataWidth ( ExtDataWidth       ),
-        .ByteWidth ( 32'd8              ),
-        .NumPorts  ( 32'd1              ),
-        .Latency   ( 32'd1              )
-      ) i_sram (
-        .clk_i   ( clk_i                              ),
-        .rst_ni  ( rst_ni                             ),
-        .req_i   ( hci_mem[i].req                     ),
-        .we_i    ( ~hci_mem[i].wen                    ),
-        .addr_i  ( hci_mem[i].add[ExtAddrOffs+:BankAddrWidth] ),
-        .wdata_i ( hci_mem[i].data                    ),
-        .be_i    ( hci_mem[i].be                      ),
-        .rdata_o ( hci_mem[i].r_data                  )
-      );
-     `endif
-   `else
-    $fatal(1, "[hwpe_subsystem] ERROR: No target memory type defined (no TARGET_WL_SCM nor TARGET_WL_SRAM)");
-  `endif
+       $fatal(1, "[hwpe_subsystem] ERROR: No target memory type defined (no TARGET_WL_SCM nor TARGET_WL_SRAM)");
+      `endif
+    `endif
   end
 
   ////////////////
