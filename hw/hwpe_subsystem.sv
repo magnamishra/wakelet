@@ -8,6 +8,7 @@
 
 /* Changes 
     -Add synthesis guard for memory bank. 
+    -Add slave mod port for AXI_BUS to handle yosys
 */
 
 `include "hci_helpers.svh"
@@ -52,7 +53,7 @@ module hwpe_subsystem
   output axi_resp_t axi_slv_rsp_o,
   output logic pixel_wakeup_o, 
   // Parameter Initialization 
-  AXI_BUS           axi_param_mem,
+  AXI_BUS.Slave          axi_param_mem,
   // Peripheral slave port
   hwpe_ctrl_intf_periph.slave periph_slave
 );
