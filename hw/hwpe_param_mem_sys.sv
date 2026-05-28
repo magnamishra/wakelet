@@ -7,7 +7,7 @@
 
 // This takes the initialization from the AXI interface and initializes weight and threshold memory
 // Add baseoffset parameter
-// Add explicit 1'b0 assignment to ar_dready to ensure Yosys doesn't synthesize an error hci_mem_routed
+// (reverted) Add explicit 1'b0 assignment to ar_dready to ensure Yosys doesn't synthesize an error hci_mem_routed
 
 `include "common_cells/registers.svh"
 `include "hci_helpers.svh"
@@ -21,7 +21,7 @@ module hwpe_param_mem_sys
 )(
   input     logic      clk_i,
   input     logic      rst_ni,
-  AXI_BUS              core_wr_slv,
+  AXI_BUS.Slave        core_wr_slv,
   hci_core_intf.target hwpe_wmem_tcdm, 
   hci_core_intf.target hwpe_nqmem_tcdm 
 );
@@ -34,7 +34,7 @@ axi_lite_data_t bus_param_mem_w_data;
 logic           bus_param_mem_we;
 logic           bus_param_mem_ack;
 
-assign core_wr_slv.ar_ready = 1'b0;
+//assign core_wr_slv.ar_ready = 1'b0;
 
 axi_to_mem_intf #(
   .ADDR_WIDTH ( AxiLiteAddrWidth ),
