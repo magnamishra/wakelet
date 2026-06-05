@@ -10,6 +10,9 @@
     -Add synthesis guard for memory bank. 
     -Add slave mod port for AXI_BUS to handle yosys
 */
+/*  Changes 
+    -Remove weight memory and activation memory 
+*/ 
 
 `include "hci_helpers.svh"
 
@@ -53,7 +56,7 @@ module hwpe_subsystem
   output axi_resp_t axi_slv_rsp_o,
   output logic pixel_wakeup_o, 
   // Parameter Initialization 
-  AXI_BUS.Slave          axi_param_mem,
+  // AXI_BUS.Slave          axi_param_mem,
   // Peripheral slave port
   hwpe_ctrl_intf_periph.slave periph_slave
 );
@@ -108,6 +111,7 @@ module hwpe_subsystem
   };
   `HCI_INTF_ARRAY(hci_mem, clk_i, 0:ActMemNumBanks-1);
 
+  /* Reverted
     // Weight memory target
   localparam hci_package::hci_size_parameter_t `HCI_SIZE_PARAM(hwpe_wmem_tcdm) = '{
     DW:  HwpeWmemDataWidth,
@@ -119,7 +123,9 @@ module hwpe_subsystem
     EHW: hci_package::DEFAULT_EHW
   };
   `HCI_INTF(hwpe_wmem_tcdm, clk_i);
+  */ 
 
+  /* Reverted 
   // Normquant memory target
   localparam hci_package::hci_size_parameter_t `HCI_SIZE_PARAM(hwpe_nqmem_tcdm) = '{
     DW:  HwpeNqmemDataWidth,
@@ -131,7 +137,8 @@ module hwpe_subsystem
     EHW: hci_package::DEFAULT_EHW
   };
   `HCI_INTF(hwpe_nqmem_tcdm, clk_i);
-
+  */ 
+  /* Reverted 
   hwpe_param_mem_sys #(
     .BaseOffset                        (  BaseOffset                      ),
     .`HCI_SIZE_PARAM(hwpe_wmem_tcdm)   ( `HCI_SIZE_PARAM(hwpe_wmem_tcdm)  ),
@@ -143,12 +150,13 @@ module hwpe_subsystem
     .hwpe_wmem_tcdm  ( hwpe_wmem_tcdm  ),
     .hwpe_nqmem_tcdm ( hwpe_nqmem_tcdm )
   );
-
+  */ 
+  /* Reverted 
   assign hwpe_wmem_tcdm.req = 1'b0;
   assign hwpe_wmem_tcdm.wen = 1'b0;
   assign hwpe_nqmem_tcdm.req = 1'b0;
   assign hwpe_nqmem_tcdm.wen = 1'b0;
-
+  */ 
   /* Interconnect */
 
   // - 2 arbitrated ports (accelerator + sensor)

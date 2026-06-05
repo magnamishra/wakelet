@@ -8,7 +8,7 @@
 // This takes the initialization from the AXI interface and initializes weight and threshold memory
 // Add baseoffset parameter
 // (reverted) Add explicit 1'b0 assignment to ar_dready to ensure Yosys doesn't synthesize an error hci_mem_routed
-
+// Add construct to ensure Yosys doesn't flag undriven ports on axi_intf_mem
 `include "common_cells/registers.svh"
 `include "hci_helpers.svh"
 module hwpe_param_mem_sys 
@@ -21,7 +21,7 @@ module hwpe_param_mem_sys
 )(
   input     logic      clk_i,
   input     logic      rst_ni,
-  AXI_BUS.Slave        core_wr_slv,
+  AXI_BUS      core_wr_slv,
   hci_core_intf.target hwpe_wmem_tcdm, 
   hci_core_intf.target hwpe_nqmem_tcdm 
 );
@@ -35,6 +35,40 @@ logic           bus_param_mem_we;
 logic           bus_param_mem_ack;
 
 //assign core_wr_slv.ar_ready = 1'b0;
+// Local AXI bus to isolate ar_ready driver from core_wr_slv.
+// Workaround for yosys-slang struct elaboration bug where ar_ready
+// is lost through AXI_ASSIGN_FROM_RESP macro expansion.
+AXI_BUS #(
+  .AXI_ADDR_WIDTH ( AxiLiteAddrWidth ),
+  .AXI_DATA_WIDTH ( AxiLiteDataWidth ),
+  .AXI_ID_WIDTH   ( 32'd1 ),
+  .AXI_USER_WIDTH ( 32'd1 )
+) core_wr_slv_local ();
+
+// Connect only write channel - this module is write-only
+assign core_wr_slv_local.aw_addr  = core_wr_slv.aw_addr;
+assign core_wr_slv_local.aw_prot  = core_wr_slv.aw_prot;
+assign core_wr_slv_local.aw_valid = core_wr_slv.aw_valid;
+assign core_wr_slv.aw_ready       = core_wr_slv_local.aw_ready;
+assign core_wr_slv_local.w_data   = core_wr_slv.w_data;
+assign core_wr_slv_local.w_strb   = core_wr_slv.w_strb;
+assign core_wr_slv_local.w_valid  = core_wr_slv.w_valid;
+assign core_wr_slv.w_ready        = core_wr_slv_local.w_ready;
+assign core_wr_slv.b_id           = core_wr_slv_local.b_id;
+assign core_wr_slv.b_resp         = core_wr_slv_local.b_resp;
+assign core_wr_slv.b_user         = core_wr_slv_local.b_user;
+assign core_wr_slv.b_valid        = core_wr_slv_local.b_valid;
+assign core_wr_slv_local.b_ready  = core_wr_slv.b_ready;
+// AR/R channels unused - tie off explicitly on core_wr_slv
+assign core_wr_slv.ar_ready       = 1'b0;
+assign core_wr_slv.r_id           = '0;
+assign core_wr_slv.r_data         = '0;
+assign core_wr_slv.r_resp         = '0;
+assign core_wr_slv.r_user         = '0;
+assign core_wr_slv.r_last         = 1'b0;
+assign core_wr_slv.r_valid        = 1'b0;
+// Tie off AR channel on local bus so axi_to_mem_intf sees no AR traffic
+assign core_wr_slv_local.ar_valid = 1'b0;
 
 axi_to_mem_intf #(
   .ADDR_WIDTH ( AxiLiteAddrWidth ),
@@ -49,7 +83,7 @@ axi_to_mem_intf #(
   .clk_i        ( clk_i                ),
   .rst_ni       ( rst_ni               ),
   .busy_o       ( /* Unconnected */    ),
-  .slv          ( core_wr_slv          ),
+  .slv          ( core_wr_slv_local    ),
   .mem_req_o    ( bus_param_mem_req    ),
   .mem_gnt_i    ( bus_param_mem_rw_gnt ),
   .mem_addr_o   ( bus_param_mem_addr   ),

@@ -7,10 +7,11 @@
 // Magna Mishra   < Wakelet soc integration only> 
 
 /*
-   Changes incorporated from prasadar/devel 
+   Changes incorporated from prasadar/devel (Reverted)
    1. Update AXI ports from axi_wide to axi_addr_
    2. Update Address offsets to accomodate HWPE in memory map
    3. Update ClusterBus map 
+   4. Revert HWPE portions needed for weight memory and parameter memory 
 */
 /*
    Changes incorporated for data mover engine  
@@ -24,7 +25,11 @@
       - user_i
       -AxiUserWidth 
 */
-
+/*
+    Changes for timing closure 
+    1. Add pipelane stage to xbar 
+    2. Modify Cluster Xbar to add AXI cut to paths inside Wakelet
+*/
 
 `include "axi/assign.svh"
 `include "reqrsp_interface/typedef.svh"
@@ -86,8 +91,8 @@ module wl_top
   // 0. to external AXI narrow master port
   // 1. to core instr memory
   // 2. to core data memory
-  // 3. to hwpe parameter memory 
-  localparam int unsigned ClusterBusNumSlaves = 4;
+  // 3. to hwpe parameter memory (reverted)
+  localparam int unsigned ClusterBusNumSlaves = 3;
 
   // Routing rules
   localparam int unsigned ClusterBusNumRules = ClusterBusNumSlaves + 1; // +1 for "everything above cluster"
@@ -95,7 +100,9 @@ module wl_top
   localparam cluster_bus_rule_t [ClusterBusNumRules-1:0] ClusterBusAddrMap = '{
     '{ // everything above cluster
         idx: 32'd0, // to external AXI narrow master port
-        start_addr: BaseOffset + HwpeNqmemBaseAddr + HwpeNqmemOffset,
+        // reverted
+        // start_addr: BaseOffset + HwpeNqmemBaseAddr + HwpeNqmemOffset,
+        start_addr: BaseOffset + DataMemBaseAddr + DataMemOffset,
         end_addr: 32'hFFFF_FFFF
     },
     '{ // Core data memory
@@ -108,11 +115,13 @@ module wl_top
         start_addr: BaseOffset + InstrMemBaseAddr,
         end_addr: BaseOffset + InstrMemBaseAddr + InstrMemOffset
     },
+    /* reverted 
     '{ // Parameter (Weight + NQ) memory 
         idx: 32'd3,
         start_addr: BaseOffset + HwpeWmemBaseAddr,
         end_addr: BaseOffset + HwpeNqmemBaseAddr + HwpeNqmemOffset
     },
+    */ 
     '{ // everything below cluster
         idx: 32'd0, // to external AXI narrow master port
         start_addr: 32'h0000_0000,
@@ -125,9 +134,9 @@ module wl_top
     NoSlvPorts:     ClusterBusNumMasters,
     NoMstPorts:     ClusterBusNumSlaves,
     MaxMstTrans:    32'd5,
-    MaxSlvTrans:    32'd2,
+    MaxSlvTrans:    32'd4,
     FallThrough:    1'b0,
-    LatencyMode:    axi_pkg::NO_LATENCY,
+    LatencyMode:    axi_pkg::CUT_ALL_PORTS,
     PipelineStages: 32'd0,
     AxiAddrWidth:   AxiLiteAddrWidth,
     AxiDataWidth:   AxiLiteDataWidth,
@@ -157,9 +166,10 @@ module wl_top
   `AXI_LITE_ASSIGN(bus_instr_mem_axi_lite_in, cluster_bus_axi_lite_out[1])
   // to core data memory
   `AXI_LITE_ASSIGN(bus_data_mem_axi_lite_in, cluster_bus_axi_lite_out[2])
+  /* reverted 
   // to hwpe memory 
   `AXI_LITE_ASSIGN(bus_hwpe_wgt_mem_axi_lite_in, cluster_bus_axi_lite_out[3])
-
+  */ 
 
   axi_lite_xbar_intf #(
     .Cfg ( ClusterBusXbarCfg ),
@@ -314,7 +324,7 @@ module wl_top
   assign bus_instr_mem_addr_remap = (bus_instr_mem_addr - BaseOffset) & (InstrMemOffset - 1);
 
   /* HWPE weight memory master */
-
+  /* revered
   AXI_LITE #(
     .AXI_ADDR_WIDTH ( AxiLiteAddrWidth ),
     .AXI_DATA_WIDTH ( AxiLiteDataWidth )
@@ -335,6 +345,7 @@ module wl_top
     .slv_ar_cache_i ( '0 ),
     .out ( axi_param_mem )
   );
+  */ 
 
   /////////////////
   // Snitch core //
@@ -781,7 +792,7 @@ module wl_top
     .pixel_wakeup_o ( pixel_wakeup ),
     .axi_slv_req_i  ( axi_slv_req_i ),
     .axi_slv_rsp_o  ( axi_slv_rsp_o ),
-    .axi_param_mem  ( axi_param_mem ),
+    // .axi_param_mem  ( axi_param_mem ),
     .periph_slave   ( periph_hwpe_if )
   );
 
