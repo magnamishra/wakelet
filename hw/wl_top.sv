@@ -137,7 +137,7 @@ module wl_top
     MaxSlvTrans:    32'd4,
     FallThrough:    1'b0,
     LatencyMode:    axi_pkg::CUT_ALL_PORTS,
-    PipelineStages: 32'd0,
+    PipelineStages: 32'd1,
     AxiAddrWidth:   AxiLiteAddrWidth,
     AxiDataWidth:   AxiLiteDataWidth,
     NoAddrRules:    ClusterBusNumRules,
